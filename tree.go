@@ -1,6 +1,9 @@
 package httprouter
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 type routeResolver interface {
 	// Resolve returns an instance of http.Handler and with a flag indicating if the route was understood.
@@ -19,14 +22,33 @@ type treeNode struct {
 	fixed        []*treeNode
 	variable     *treeNode
 	wildcard     *treeNode
+	parent       *treeNode
 }
 
-func newTreeNode() *treeNode {
+func newTreeNode(path string, allowed Method, handler http.Handler) *treeNode {
+	treeNode{
+		pathFragment: path,
+		allowed:      allowed,
+		handler:      handler,
+		fixed:        nil,
+		variable:     nil,
+		wildcard:     nil,
+		parent:       nil,
+	}
 	return &treeNode{}
 }
 
 func (this *treeNode) Add(route Route) error {
 	// this.allowed = route.AllowedMethods
+	pathFragments := strings.Split(route.Path, "/")
+	for i, fragment := range pathFragments {
+		if i != len(pathFragments)-1 {
+			fragment = fragment + "/"
+			//parent := pathFragments[i - 1] fixme: find a way to set the parent treenode
+		}
+		newTreeNode(fragment, route.AllowedMethods, route.Handler)
+	}
+
 	this.handler = route.Handler
 	return nil
 }
