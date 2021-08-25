@@ -15,17 +15,6 @@ type routeResolver interface {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-//type treeNode struct {
-//	pathFragment string
-//	allowed      Method // if different handlers are configured for GET vs POST, etc. add another child node
-//	handler      http.Handler
-//	fixed        []*treeNode
-//	variable     *treeNode
-//	wildcard     *treeNode
-//	parent       *treeNode
-//}
-
 type treeNode struct {
 	pathFragment   string
 	staticChildren []*treeNode
@@ -40,9 +29,14 @@ func main() {
 
 	method := MethodGet
 	incomingPath := "/path/whatever"
-	handler, resourceExists := tree.Resolve(method, incomingPath)
+	_, resourceExists := tree.Resolve(method, incomingPath) // FIXME
+
+	if resourceExists { //FIXME
+
+	}
 }
 
+//TODO: Check for no trailing /
 func (this *treeNode) Add(route Route) error {
 	if len(route.Path) == 0 {
 		if this.handlers[route.AllowedMethod] != nil { // The handler method already exists
@@ -65,15 +59,15 @@ func (this *treeNode) Add(route Route) error {
 	if slashIndex == -1 {
 		pathFragmentForChildNode = route.Path
 	} else {
-		pathFragmentForChildNode = route.Path[0 : slashIndex+1] // includes the trailing slash
+		pathFragmentForChildNode = route.Path[0 : slashIndex+1] // includes the trailing slash //FIXME
 	}
 
 	//Check that all characters in path are valid
-	if !validCharacter(pathFragmentForChildNode){
+	if !validCharacter(pathFragmentForChildNode) {
 		return ErrInvalidCharacter
 	}
 
-	route.Path = route.Path[slashIndex+1:]
+	//route.Path = route.Path[slashIndex+1:]
 
 	if strings.HasPrefix(pathFragmentForChildNode, "*") {
 		wildChildRoute := Route{
@@ -81,7 +75,7 @@ func (this *treeNode) Add(route Route) error {
 			Path:          route.Path,
 			Handler:       route.Handler,
 		}
-		return this.addWildcardChild(wildChildRoute)
+		return this.addWildcardChild(wildChildRoute, pathFragmentForChildNode)
 	}
 
 	if strings.HasPrefix(pathFragmentForChildNode, ":") {
@@ -90,7 +84,7 @@ func (this *treeNode) Add(route Route) error {
 			Path:          route.Path,
 			Handler:       route.Handler,
 		}
-		return this.addVariableChild(variableChildRoute)
+		return this.addVariableChild(variableChildRoute, pathFragmentForChildNode)
 	}
 
 	staticChildRoute := Route{
@@ -98,9 +92,9 @@ func (this *treeNode) Add(route Route) error {
 		Path:          route.Path,
 		Handler:       route.Handler,
 	}
-	return this.addStaticChild(staticChildRoute)
+	return this.addStaticChild(staticChildRoute, pathFragmentForChildNode)
 }
-func (this *treeNode) addWildcardChild(route Route) error {
+func (this *treeNode) addWildcardChild(route Route, pathFragment string) error {
 	// validate incoming route.Path (must only be "*")
 	if len(route.Path) > 1 {
 		return ErrInvalidWildCard
@@ -115,8 +109,8 @@ func (this *treeNode) addWildcardChild(route Route) error {
 	this.wildcardChild = &treeNode{handlers: map[Method]http.Handler{}}
 	return this.wildcardChild.Add(route)
 }
-func (this *treeNode) addVariableChild(route Route) error {
-	route.Path = route.Path[len(this.pathFragment):]
+func (this *treeNode) addVariableChild(route Route, pathFragment string) error {
+	route.Path = route.Path[len(pathFragment):]
 	//TODO: create error checking function
 	if this.variableChild != nil {
 		return this.variableChild.Add(route)
@@ -125,10 +119,12 @@ func (this *treeNode) addVariableChild(route Route) error {
 	this.variableChild = &treeNode{handlers: map[Method]http.Handler{}}
 	return this.variableChild.Add(route)
 }
-func (this *treeNode) addStaticChild(route Route) error {
-	route.Path = route.Path[len(this.pathFragment):]
+
+func (this *treeNode) addStaticChild(route Route, pathFragment string) error {
+	route.Path = route.Path[len(pathFragment):]
 
 	staticChild := &treeNode{handlers: map[Method]http.Handler{}}
+
 	if err := staticChild.Add(route); err != nil {
 		return err
 	}
@@ -184,13 +180,13 @@ func validCharacter(input string) bool {
 		if unicode.IsDigit(i) {
 			continue
 		}
-		if isSpecialCharacter(i){
+		if isSpecialCharacter(i) {
 			continue
 		}
 		return false
 	}
 	return true
 }
-func isSpecialCharacter(i rune) bool{
-	return i == '*' || i == ':' || i == '.' || i == '-' || i == '_' || i == '\\'
+func isSpecialCharacter(i rune) bool {
+	return i == '*' || i == ':' || i == '.' || i == '-' || i == '_' || i == '/'
 }

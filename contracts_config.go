@@ -6,7 +6,7 @@ func New(options ...option) (http.Handler, error) {
 	var config configuration
 	Options.apply(options...)(&config)
 
-	treeRoot := newTreeNode()
+	treeRoot :=  &treeNode{}
 	for _, route := range config.Routes {
 		if err := treeRoot.Add(route); err != nil {
 			return nil, err

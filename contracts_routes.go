@@ -7,8 +7,8 @@ import (
 
 type Route struct {
 	AllowedMethod Method
-	Path           string
-	Handler        http.Handler
+	Path          string
+	Handler       http.Handler
 }
 
 func ParseRoutes(allowedMethods string, paths string, handler http.Handler) (routes []Route) {
@@ -23,8 +23,8 @@ func ParseRoutes(allowedMethods string, paths string, handler http.Handler) (rou
 func ParseRoute(allowedMethods string, path string, handler http.Handler) Route {
 	return Route{
 		AllowedMethod: ParseMethods(allowedMethods),
-		Path:           strings.TrimSpace(path),
-		Handler:        handler,
+		Path:          strings.TrimSpace(path),
+		Handler:       handler,
 	}
 }
 func (this Route) String() string   { return this.AllowedMethod.String() + " " + this.Path }

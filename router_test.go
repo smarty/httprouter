@@ -7,16 +7,17 @@ import (
 )
 
 func TestRoutes(t *testing.T) {
-	tree := newTreeNode()
+	tree :=  &treeNode{}
 
 	assertRoutes(t, tree,
-		addRoute(tree, "GET", "/"),
+		addRoute(tree, "GET", "stuff/"), //FIXME: How do we fix it with the leading /
 		// addRoute(tree, "PUT", "/"), // TODO
 	)
 }
 func addRoute(tree *treeNode, method, path string) fakeHandler {
 	parsedMethod := ParseMethod(method)
 	handler := newSampleHandler(parsedMethod, path)
+
 	tree.Add(handler.Route())
 	return handler
 }
@@ -38,8 +39,8 @@ func newSampleHandler(method Method, path string) fakeHandler {
 func (this fakeHandler) Route() Route {
 	return Route{
 		AllowedMethod: ParseMethod(strings.Split(string(this), " ")[0]),
-		Path:           strings.Split(string(this), " ")[1],
-		Handler:        this,
+		Path:          strings.Split(string(this), " ")[1],
+		Handler:       this,
 	}
 }
 func (this fakeHandler) ServeHTTP(http.ResponseWriter, *http.Request) {}
