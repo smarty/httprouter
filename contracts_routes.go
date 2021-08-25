@@ -6,7 +6,7 @@ import (
 )
 
 type Route struct {
-	AllowedMethods Method
+	AllowedMethod Method
 	Path           string
 	Handler        http.Handler
 }
@@ -22,12 +22,12 @@ func ParseRoutes(allowedMethods string, paths string, handler http.Handler) (rou
 }
 func ParseRoute(allowedMethods string, path string, handler http.Handler) Route {
 	return Route{
-		AllowedMethods: ParseMethods(allowedMethods),
+		AllowedMethod: ParseMethods(allowedMethods),
 		Path:           strings.TrimSpace(path),
 		Handler:        handler,
 	}
 }
-func (this Route) String() string   { return this.AllowedMethods.String() + " " + this.Path }
+func (this Route) String() string   { return this.AllowedMethod.String() + " " + this.Path }
 func (this Route) GoString() string { return this.String() }
 
 const pipeDelimiter = "|"
