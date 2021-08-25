@@ -120,12 +120,12 @@ func (this *treeNode) addVariableChild(route Route, pathFragment string) error {
 	return this.variableChild.Add(route)
 }
 
-func (this *treeNode) addStaticChild(route Route, pathFragment string) error {
+func (this *treeNode) addStaticChild(route Route, pathFragment string) (err error) {
 	route.Path = route.Path[len(pathFragment):]
 
 	staticChild := &treeNode{handlers: map[Method]http.Handler{}}
 
-	if err := staticChild.Add(route); err != nil {
+	if err = staticChild.Add(route); err != nil {
 		return err
 	}
 
