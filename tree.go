@@ -3,6 +3,7 @@ package httprouter
 import (
 	"net/http"
 	"strings"
+	"unicode"
 )
 
 type routeResolver interface {
@@ -37,30 +38,25 @@ func main() {
 	tree := &treeNode{}
 	// tree.Add(routes)
 
-	method := "GET"
+	method := MethodGet
 	incomingPath := "/path/whatever"
 	handler, resourceExists := tree.Resolve(method, incomingPath)
 }
 
 func (this *treeNode) Add(route Route) error {
 	if len(route.Path) == 0 {
-		return nil
-	}
-	//TODO: get rid of
-	handler, pathExists := this.Resolve(route.AllowedMethod, route.Path)
-	if handler == route.Handler && pathExists {
-		return nil
-	} else if handler != route.Handler && pathExists {
-		// TODO: if method already exists, should we return some kind of error
-		// to indicate that we are overwriting the handler for a particular method?
+		if this.handlers[route.AllowedMethod] != nil { // The handler method already exists
+			return ErrMethodAlreadyExists
+		}
 		this.handlers[route.AllowedMethod] = route.Handler
+		return nil
 	}
 
 	slashIndex := strings.Index(route.Path, "/")
 	if slashIndex == 0 {
 		// first character is a slash, that means the URL provided looks something like this:
 		// /path/to//document # note the double slash
-		return nil //ErrMalformedRoute
+		return ErrMalformedRoute
 	}
 
 	var pathFragmentForChildNode string
@@ -72,10 +68,12 @@ func (this *treeNode) Add(route Route) error {
 		pathFragmentForChildNode = route.Path[0 : slashIndex+1] // includes the trailing slash
 	}
 
-	// does this incoming route fragement indicate a static, variable, or wildcard child?
-	// TODO: (ensure only allowed characters) [A-Z a-z 0-9 _ - . : * ]
+	//Check that all characters in path are valid
+	if !validCharacter(pathFragmentForChildNode){
+		return ErrInvalidCharacter
+	}
 
-	route.Path = route.Path[slashIndex+1:] // TODO: strip off what we've already considered
+	route.Path = route.Path[slashIndex+1:]
 
 	if strings.HasPrefix(pathFragmentForChildNode, "*") {
 		wildChildRoute := Route{
@@ -105,7 +103,7 @@ func (this *treeNode) Add(route Route) error {
 func (this *treeNode) addWildcardChild(route Route) error {
 	// validate incoming route.Path (must only be "*")
 	if len(route.Path) > 1 {
-		return nil //errInvalidWildCard //Todo
+		return ErrInvalidWildCard
 	}
 	route.Path = "" // now truncate it to ""
 
@@ -119,7 +117,7 @@ func (this *treeNode) addWildcardChild(route Route) error {
 }
 func (this *treeNode) addVariableChild(route Route) error {
 	route.Path = route.Path[len(this.pathFragment):]
-	//todo: create error checking function
+	//TODO: create error checking function
 	if this.variableChild != nil {
 		return this.variableChild.Add(route)
 	}
@@ -140,8 +138,8 @@ func (this *treeNode) addStaticChild(route Route) error {
 }
 
 func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler, bool) {
+	//TODO: return 405 error if the handler is nil
 	if len(incomingPath) == 0 {
-		//return 405 error if the handler is nil
 		return this.handlers[method], true // why true? because we got to a place where the resource exists
 	}
 
@@ -158,7 +156,7 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 			return handler, resourceExists
 		}
 
-		break // don't bother checking any more of sibilings of the static child, they don't match
+		break // don't bother checking any more of siblings of the static child, they don't match
 	}
 
 	if this.variableChild != nil {
@@ -174,6 +172,25 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 		return this.wildcardChild.Resolve(method, "") // wildcard matches everything, don't bother with the path
 	}
 
-	//nothing matches -- return 404 error
+	//TODO: nothing matches -- return 404 error
 	return nil, resourceExists // no wildcard children
+}
+
+func validCharacter(input string) bool {
+	for _, i := range input {
+		if unicode.IsLetter(i) {
+			continue
+		}
+		if unicode.IsDigit(i) {
+			continue
+		}
+		if isSpecialCharacter(i){
+			continue
+		}
+		return false
+	}
+	return true
+}
+func isSpecialCharacter(i rune) bool{
+	return i == '*' || i == ':' || i == '.' || i == '-' || i == '_' || i == '\\'
 }
