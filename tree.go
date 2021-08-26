@@ -36,7 +36,6 @@ func main() {
 	}
 }
 
-//TODO: Check for no trailing /
 func (this *treeNode) Add(route Route) error {
 	if len(route.Path) == 0 {
 		if this.handlers[route.AllowedMethod] != nil { // The handler method already exists
@@ -126,9 +125,9 @@ func (this *treeNode) addVariableChild(route Route, pathFragment string) error {
 func (this *treeNode) addStaticChild(route Route, pathFragment string) (err error) {
 	route.Path = route.Path[len(pathFragment):]
 
-	for i := range this.staticChildren {
-		if this.staticChildren[i].pathFragment == pathFragment {
-			return this.staticChildren[i].Add(route)
+	for _, staticChild := range this.staticChildren {
+		if staticChild.pathFragment == pathFragment {
+			return staticChild.Add(route)
 		}
 	}
 
@@ -151,9 +150,18 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 		incomingPath = incomingPath[1:]
 	}
 
+	slashIndex := strings.Index(incomingPath, "/")
+
+	var pathFragment string
+	if slashIndex == -1 {
+		pathFragment = incomingPath
+	} else {
+		pathFragment = incomingPath[0:slashIndex]
+	}
+
 	var resourceExists bool
 	for _, staticChild := range this.staticChildren {
-		if !strings.HasPrefix(incomingPath, staticChild.pathFragment) {
+		if strings.Compare(pathFragment, staticChild.pathFragment) != 0 {
 			continue // the child doesn't match, skip it
 		}
 
@@ -168,16 +176,19 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 	}
 
 	if this.variableChild != nil {
-		remainingPath := incomingPath[len(this.variableChild.pathFragment):]
-		handler, resourceExists := this.variableChild.Resolve(method, remainingPath)
-		if handler != nil {
-			return handler, resourceExists
+		if strings.HasPrefix(incomingPath, this.variableChild.pathFragment) {
+			remainingPath := incomingPath[len(this.variableChild.pathFragment):]
+			handler, resourceExists := this.variableChild.Resolve(method, remainingPath)
+			if handler != nil {
+				return handler, resourceExists
+			}
 		}
-
 	}
 
 	if this.wildcardChild != nil {
-		return this.wildcardChild.Resolve(method, "") // wildcard matches everything, don't bother with the path
+		if strings.HasPrefix(incomingPath, this.wildcardChild.pathFragment) {
+			return this.wildcardChild.Resolve(method, "") // wildcard matches everything, don't bother with the path
+		}
 	}
 
 	//TODO: nothing matches -- return 404 error
