@@ -46,6 +46,12 @@ func (this *treeNode) Add(route Route) error {
 		return nil
 	}
 
+	if route.Path[0] == '/' {
+		route.Path = route.Path[1:]
+	} else {
+		return ErrMalformedRoute
+	}
+
 	slashIndex := strings.Index(route.Path, "/")
 	if slashIndex == 0 {
 		// first character is a slash, that means the URL provided looks something like this:
@@ -55,19 +61,16 @@ func (this *treeNode) Add(route Route) error {
 
 	var pathFragmentForChildNode string
 
-	// -1:   doesn't contain --> it is something like /identity
 	if slashIndex == -1 {
 		pathFragmentForChildNode = route.Path
 	} else {
-		pathFragmentForChildNode = route.Path[0 : slashIndex+1] // includes the trailing slash //FIXME
+		pathFragmentForChildNode = route.Path[0:slashIndex]
 	}
 
 	//Check that all characters in path are valid
 	if !validCharacter(pathFragmentForChildNode) {
 		return ErrInvalidCharacter
 	}
-
-	//route.Path = route.Path[slashIndex+1:]
 
 	if strings.HasPrefix(pathFragmentForChildNode, "*") {
 		wildChildRoute := Route{
@@ -123,7 +126,7 @@ func (this *treeNode) addVariableChild(route Route, pathFragment string) error {
 func (this *treeNode) addStaticChild(route Route, pathFragment string) (err error) {
 	route.Path = route.Path[len(pathFragment):]
 
-	staticChild := &treeNode{handlers: map[Method]http.Handler{}}
+	staticChild := &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 
 	if err = staticChild.Add(route); err != nil {
 		return err

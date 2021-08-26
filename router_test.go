@@ -7,12 +7,13 @@ import (
 )
 
 func TestRoutes(t *testing.T) {
-	tree :=  &treeNode{}
-
+	tree := &treeNode{}
+	numOfStaticChildren := len(tree.staticChildren)
 	assertRoutes(t, tree,
-		addRoute(tree, "GET", "stuff/"), //FIXME: How do we fix it with the leading /
+		addRoute(tree, "GET", "/stuff/identities"), //FIXME: How do we fix it with the leading /
 		// addRoute(tree, "PUT", "/"), // TODO
 	)
+	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
 }
 func addRoute(tree *treeNode, method, path string) fakeHandler {
 	parsedMethod := ParseMethod(method)
