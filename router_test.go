@@ -13,8 +13,9 @@ func TestStaticRoutes(t *testing.T) {
 		addRoute(tree, "GET", "/"),
 		addRoute(tree, "GET", "/stuff"),
 		addRoute(tree, "GET", "/stuff/identities"),
+		addRoute(tree, "GET", "/stuff1"),
 	)
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 2)
+	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 3)
 }
 
 func TestVariableRoutes(t *testing.T) {
@@ -88,12 +89,14 @@ func TestMalformedRouteErr(t *testing.T) {
 	_, err3 := addRouteWithError(tree, "GET", "/stu:ff")
 	_, err4 := addRouteWithError(tree, "GET", "/stuff//identities")
 	_, err5 := addRouteWithError(tree, "GET", "/stuff/*more_stuff")
+	_, err6 := addRouteWithError(tree, "GET", "stuff")
 	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren)
 	Assert(t).That(err1).Equals(ErrMalformedRoute)
 	Assert(t).That(err2).Equals(ErrInvalidCharacter)
 	Assert(t).That(err3).Equals(ErrInvalidCharacter)
 	Assert(t).That(err4).Equals(ErrMalformedRoute)
 	Assert(t).That(err5).Equals(ErrInvalidWildCard)
+	Assert(t).That(err6).Equals(ErrMalformedRoute)
 }
 
 func addRoute(tree *treeNode, method, path string) fakeHandler {
