@@ -109,7 +109,7 @@ func (this *treeNode) addWildcardChild(route Route, pathFragment string) error {
 		return this.wildcardChild.Add(route)
 	}
 
-	this.wildcardChild = &treeNode{handlers: map[Method]http.Handler{}}
+	this.wildcardChild = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	return this.wildcardChild.Add(route)
 }
 func (this *treeNode) addVariableChild(route Route, pathFragment string) error {
@@ -119,12 +119,18 @@ func (this *treeNode) addVariableChild(route Route, pathFragment string) error {
 		return this.variableChild.Add(route)
 	}
 
-	this.variableChild = &treeNode{handlers: map[Method]http.Handler{}}
+	this.variableChild = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	return this.variableChild.Add(route)
 }
 
 func (this *treeNode) addStaticChild(route Route, pathFragment string) (err error) {
 	route.Path = route.Path[len(pathFragment):]
+
+	for i := range this.staticChildren {
+		if this.staticChildren[i].pathFragment == pathFragment {
+			return this.staticChildren[i].Add(route)
+		}
+	}
 
 	staticChild := &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 
@@ -140,6 +146,9 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 	//TODO: return 405 error if the handler is nil
 	if len(incomingPath) == 0 {
 		return this.handlers[method], true // why true? because we got to a place where the resource exists
+	}
+	if incomingPath[0] == '/' {
+		incomingPath = incomingPath[1:]
 	}
 
 	var resourceExists bool

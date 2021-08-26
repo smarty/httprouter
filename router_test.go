@@ -10,8 +10,9 @@ func TestRoutes(t *testing.T) {
 	tree := &treeNode{}
 	numOfStaticChildren := len(tree.staticChildren)
 	assertRoutes(t, tree,
-		addRoute(tree, "GET", "/stuff/identities"), //FIXME: How do we fix it with the leading /
+		addRoute(tree, "GET", "/stuff"), //FIXME: How do we fix it with the leading /
 		// addRoute(tree, "PUT", "/"), // TODO
+		addRoute(tree, "GET", "/stuff/identities"),
 	)
 	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
 }
