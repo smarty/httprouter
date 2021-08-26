@@ -196,20 +196,23 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 }
 
 func validCharacter(input string) bool {
-	for _, i := range input {
-		if unicode.IsLetter(i) {
+	for index, r := range input {
+		if unicode.IsLetter(r) {
 			continue
 		}
-		if unicode.IsDigit(i) {
+		if unicode.IsDigit(r) {
 			continue
 		}
-		if isSpecialCharacter(i) {
+		if isSpecialCharacter(r) {
+			continue
+		}
+		if index == 0 && (r == '*' || r == ':') {
 			continue
 		}
 		return false
 	}
 	return true
 }
-func isSpecialCharacter(i rune) bool {
-	return i == '*' || i == ':' || i == '.' || i == '-' || i == '_' || i == '/'
+func isSpecialCharacter(r rune) bool {
+	return r == '.' || r == '-' || r == '_'
 }

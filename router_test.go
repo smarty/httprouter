@@ -70,6 +70,32 @@ func TestHandlers(t *testing.T) {
 	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
 }
 
+func TestHandlerAlreadyExistsErr(t *testing.T) {
+	tree := &treeNode{}
+	numOfStaticChildren := len(tree.staticChildren)
+	_, err1 := addRouteWithError(tree, "GET", "/stuff")
+	_, err2 := addRouteWithError(tree, "GET", "/stuff")
+	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
+	Assert(t).That(err1).Equals(nil)
+	Assert(t).That(err2).Equals(ErrMethodAlreadyExists)
+}
+
+func TestMalformedRouteErr(t *testing.T) {
+	tree := &treeNode{}
+	numOfStaticChildren := len(tree.staticChildren)
+	_, err1 := addRouteWithError(tree, "GET", "//stuff")
+	_, err2 := addRouteWithError(tree, "GET", "/stu*ff")
+	_, err3 := addRouteWithError(tree, "GET", "/stu:ff")
+	_, err4 := addRouteWithError(tree, "GET", "/stuff//identities")
+	_, err5 := addRouteWithError(tree, "GET", "/stuff/*more_stuff")
+	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren)
+	Assert(t).That(err1).Equals(ErrMalformedRoute)
+	Assert(t).That(err2).Equals(ErrInvalidCharacter)
+	Assert(t).That(err3).Equals(ErrInvalidCharacter)
+	Assert(t).That(err4).Equals(ErrMalformedRoute)
+	Assert(t).That(err5).Equals(ErrInvalidWildCard)
+}
+
 func addRoute(tree *treeNode, method, path string) fakeHandler {
 	parsedMethod := ParseMethod(method)
 	handler := newSampleHandler(parsedMethod, path)
@@ -89,6 +115,13 @@ func createNonExistingRoute(method, path string) fakeHandler {
 	handler := newSampleHandler(parsedMethod, path)
 
 	return handler
+}
+func addRouteWithError(tree *treeNode, method, path string) (fakeHandler, error) {
+	parsedMethod := ParseMethod(method)
+	handler := newSampleHandler(parsedMethod, path)
+
+	err := tree.Add(handler.Route())
+	return handler, err
 }
 func assertNonExistingRoute(t *testing.T, tree *treeNode, handlers ...fakeHandler) {
 	for _, handler := range handlers {
