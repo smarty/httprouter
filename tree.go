@@ -6,22 +6,12 @@ import (
 	"unicode"
 )
 
-type routeResolver interface {
-	// Resolve returns an instance of http.Handler and with a flag indicating if the route was understood.
-	// If the http.Handler instance is not nil, the route was fully resolved and can be invoked.
-	// If the http.Handler instance is nil AND the flag is true, the route was found, but the method isn't compatible (e.g. "POST /", but only a "GET /" was found.
-	// If the http.Handler instance is nil AND the flag is false, the route was not found.
-	Resolve(method Method, path string) (http.Handler, bool)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 type treeNode struct {
 	pathFragment string
 	static       []*treeNode
 	variable     *treeNode
 	wildcard     *treeNode
-	handlers     *methodHandlers
+	registered   *methodHandlers
 }
 
 func (this *treeNode) Add(route Route) error {
@@ -29,11 +19,11 @@ func (this *treeNode) Add(route Route) error {
 	// this would be called after all calls to Add have been completed which would finalize the tree.
 
 	if len(route.Path) == 0 {
-		if this.handlers == nil {
-			this.handlers = &methodHandlers{}
+		if this.registered == nil {
+			this.registered = &methodHandlers{}
 		}
 
-		return this.handlers.Add(route.AllowedMethods, route.Handler)
+		return this.registered.Add(route.AllowedMethods, route.Handler)
 	}
 
 	if route.Path[0] == '/' {
@@ -123,7 +113,7 @@ func hasOnlyAllowedCharacters(input string) bool {
 
 func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler, bool) {
 	if len(incomingPath) == 0 {
-		return this.handlers.Resolve(method)
+		return this.registered.Resolve(method)
 	}
 
 	if incomingPath[0] == '/' {
