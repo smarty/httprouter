@@ -29,12 +29,7 @@ type treeNode struct {
 
 func (this *treeNode) Add(route Route) error {
 	if len(route.Path) == 0 {
-		if _, contains := this.handlers[route.AllowedMethod]; contains {
-			return ErrRouteExists
-		} else {
-			this.handlers[route.AllowedMethod] = route.Handler
-			return nil
-		}
+		return this.attachHandler(route.AllowedMethod, route.Handler)
 	}
 
 	if route.Path[0] == '/' {
@@ -69,6 +64,14 @@ func (this *treeNode) Add(route Route) error {
 
 	return this.addStatic(route, pathFragmentForChildNode)
 }
+func (this *treeNode) attachHandler(allowed Method, handler http.Handler) error {
+	if _, contains := this.handlers[allowed]; contains {
+		return ErrRouteExists
+	}
+
+	this.handlers[allowed] = handler
+	return nil
+}
 func (this *treeNode) addWildcard(route Route, pathFragment string) error {
 	// validate incoming route.Path (must only be "*")
 	if len(route.Path) > 1 {
@@ -77,21 +80,19 @@ func (this *treeNode) addWildcard(route Route, pathFragment string) error {
 
 	route.Path = "" // now truncate it to ""
 
-	if this.wildcard != nil {
-		return this.wildcard.Add(route) // wildcard child already exists, attach a handler for the specified method
+	if this.wildcard == nil {
+		this.wildcard = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	}
 
-	this.wildcard = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	return this.wildcard.Add(route)
 }
 func (this *treeNode) addVariable(route Route, pathFragment string) error {
 	route.Path = route.Path[len(pathFragment):]
 
-	if this.variable != nil {
-		return this.variable.Add(route) // variable child already exists, attach a handler for the specified method
+	if this.variable == nil {
+		this.variable = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	}
 
-	this.variable = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	return this.variable.Add(route)
 }
 func (this *treeNode) addStatic(route Route, pathFragment string) (err error) {
