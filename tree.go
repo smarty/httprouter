@@ -15,137 +15,122 @@ type routeResolver interface {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 type treeNode struct {
-	pathFragment   string
-	staticChildren []*treeNode
-	variableChild  *treeNode
-	wildcardChild  *treeNode
-	handlers       map[Method]http.Handler
-}
-
-func main() {
-	tree := &treeNode{}
-	// tree.Add(routes)
-
-	method := MethodGet
-	incomingPath := "/path/whatever"
-	_, resourceExists := tree.Resolve(method, incomingPath) // FIXME
-
-	if resourceExists { //FIXME
-
-	}
+	pathFragment string
+	static       []*treeNode
+	variable     *treeNode
+	wildcard     *treeNode
+	handlers     map[Method]http.Handler
 }
 
 func (this *treeNode) Add(route Route) error {
 	if len(route.Path) == 0 {
-		if this.handlers[route.AllowedMethod] != nil { // The handler method already exists
-			return ErrMethodAlreadyExists
+		if _, contains := this.handlers[route.AllowedMethod]; contains {
+			return ErrRouteExists
+		} else {
+			this.handlers[route.AllowedMethod] = route.Handler
+			return nil
 		}
-		this.handlers[route.AllowedMethod] = route.Handler
-		return nil
 	}
 
 	if route.Path[0] == '/' {
 		route.Path = route.Path[1:]
 	} else {
-		return ErrMalformedRoute
+		return ErrMalformedPath
 	}
 
+	var pathFragmentForChildNode string
 	slashIndex := strings.Index(route.Path, "/")
 	if slashIndex == 0 {
 		// first character is a slash, that means the URL provided looks something like this:
 		// /path/to//document # note the double slash
-		return ErrMalformedRoute
-	}
-
-	var pathFragmentForChildNode string
-
-	if slashIndex == -1 {
+		return ErrMalformedPath
+	} else if slashIndex == -1 {
 		pathFragmentForChildNode = route.Path
 	} else {
 		pathFragmentForChildNode = route.Path[0:slashIndex]
 	}
 
-	//Check that all characters in path are valid
-	if !validCharacter(pathFragmentForChildNode) {
-		return ErrInvalidCharacter
+	if !hasOnlyAllowedCharacters(pathFragmentForChildNode) {
+		return ErrInvalidCharacters
 	}
 
 	if strings.HasPrefix(pathFragmentForChildNode, "*") {
-		wildChildRoute := Route{
-			AllowedMethod: route.AllowedMethod,
-			Path:          route.Path,
-			Handler:       route.Handler,
-		}
-		return this.addWildcardChild(wildChildRoute, pathFragmentForChildNode)
+		return this.addWildcard(route, pathFragmentForChildNode)
 	}
 
 	if strings.HasPrefix(pathFragmentForChildNode, ":") {
-		variableChildRoute := Route{
-			AllowedMethod: route.AllowedMethod,
-			Path:          route.Path,
-			Handler:       route.Handler,
-		}
-		return this.addVariableChild(variableChildRoute, pathFragmentForChildNode)
+		return this.addVariable(route, pathFragmentForChildNode)
 	}
 
-	staticChildRoute := Route{
-		AllowedMethod: route.AllowedMethod,
-		Path:          route.Path,
-		Handler:       route.Handler,
-	}
-	return this.addStaticChild(staticChildRoute, pathFragmentForChildNode)
+	return this.addStatic(route, pathFragmentForChildNode)
 }
-func (this *treeNode) addWildcardChild(route Route, pathFragment string) error {
+func (this *treeNode) addWildcard(route Route, pathFragment string) error {
 	// validate incoming route.Path (must only be "*")
 	if len(route.Path) > 1 {
-		return ErrInvalidWildCard
+		return ErrInvalidWildcard
 	}
+
 	route.Path = "" // now truncate it to ""
 
-	if this.wildcardChild != nil {
-		// wildcard child already exists, attach a handler for the specific method
-		return this.wildcardChild.Add(route)
+	if this.wildcard != nil {
+		return this.wildcard.Add(route) // wildcard child already exists, attach a handler for the specified method
 	}
 
-	this.wildcardChild = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
-	return this.wildcardChild.Add(route)
+	this.wildcard = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
+	return this.wildcard.Add(route)
 }
-func (this *treeNode) addVariableChild(route Route, pathFragment string) error {
+func (this *treeNode) addVariable(route Route, pathFragment string) error {
 	route.Path = route.Path[len(pathFragment):]
-	//TODO: create error checking function
-	if this.variableChild != nil {
-		return this.variableChild.Add(route)
+
+	if this.variable != nil {
+		return this.variable.Add(route) // variable child already exists, attach a handler for the specified method
 	}
 
-	this.variableChild = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
-	return this.variableChild.Add(route)
+	this.variable = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
+	return this.variable.Add(route)
 }
-
-func (this *treeNode) addStaticChild(route Route, pathFragment string) (err error) {
+func (this *treeNode) addStatic(route Route, pathFragment string) (err error) {
 	route.Path = route.Path[len(pathFragment):]
 
-	for _, staticChild := range this.staticChildren {
+	for _, staticChild := range this.static {
 		if staticChild.pathFragment == pathFragment {
 			return staticChild.Add(route)
 		}
 	}
 
 	staticChild := &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
-
 	if err = staticChild.Add(route); err != nil {
 		return err
 	}
 
-	this.staticChildren = append(this.staticChildren, staticChild)
+	this.static = append(this.static, staticChild)
 	return nil
+}
+func hasOnlyAllowedCharacters(input string) bool {
+	for index, value := range input {
+		if unicode.IsLetter(value) {
+			continue // TODO: ASCII only (a-z A-Z)
+		} else if unicode.IsDigit(value) {
+			continue // TODO: ASCII only (0-9)
+		} else if value == '.' || value == '-' || value == '_' {
+			continue
+		} else if index == 0 && (value == '*' || value == ':') {
+			continue
+		}
+
+		return false
+	}
+
+	return true
 }
 
 func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler, bool) {
-	//TODO: return 405 error if the handler is nil
 	if len(incomingPath) == 0 {
-		return this.handlers[method], true // why true? because we got to a place where the resource exists
+		return this.handlers[method], true // the resource exists, even if no method exists
 	}
+
 	if incomingPath[0] == '/' {
 		incomingPath = incomingPath[1:]
 	}
@@ -159,60 +144,34 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 		pathFragment = incomingPath[0:slashIndex]
 	}
 
-	var resourceExists bool
-	for _, staticChild := range this.staticChildren {
-		if strings.Compare(pathFragment, staticChild.pathFragment) != 0 {
-			continue // the child doesn't match, skip it
+	for _, staticChild := range this.static {
+		if pathFragment != staticChild.pathFragment {
+			continue
 		}
 
-		// at this point, the path fragment DOES match...
+		// the path fragment DOES match...
 		remainingPath := incomingPath[len(staticChild.pathFragment):]
-		handler, resourceExists := staticChild.Resolve(method, remainingPath)
-		if handler != nil {
+		if handler, resourceExists := staticChild.Resolve(method, remainingPath); handler != nil {
 			return handler, resourceExists
 		}
 
 		break // don't bother checking any more of siblings of the static child, they don't match
 	}
 
-	if this.variableChild != nil {
-		if strings.HasPrefix(incomingPath, this.variableChild.pathFragment) {
-			remainingPath := incomingPath[len(this.variableChild.pathFragment):]
-			handler, resourceExists := this.variableChild.Resolve(method, remainingPath)
-			if handler != nil {
+	if this.variable != nil {
+		if strings.HasPrefix(incomingPath, this.variable.pathFragment) {
+			remainingPath := incomingPath[len(this.variable.pathFragment):]
+			if handler, resourceExists := this.variable.Resolve(method, remainingPath); handler != nil {
 				return handler, resourceExists
 			}
 		}
 	}
 
-	if this.wildcardChild != nil {
-		if strings.HasPrefix(incomingPath, this.wildcardChild.pathFragment) {
-			return this.wildcardChild.Resolve(method, "") // wildcard matches everything, don't bother with the path
+	if this.wildcard != nil {
+		if strings.HasPrefix(incomingPath, this.wildcard.pathFragment) {
+			return this.wildcard.Resolve(method, "") // wildcard matches everything, don't bother with the path
 		}
 	}
 
-	//TODO: nothing matches -- return 404 error
-	return nil, resourceExists // no wildcard children
-}
-
-func validCharacter(input string) bool {
-	for index, r := range input {
-		if unicode.IsLetter(r) {
-			continue
-		}
-		if unicode.IsDigit(r) {
-			continue
-		}
-		if isSpecialCharacter(r) {
-			continue
-		}
-		if index == 0 && (r == '*' || r == ':') {
-			continue
-		}
-		return false
-	}
-	return true
-}
-func isSpecialCharacter(r rune) bool {
-	return r == '.' || r == '-' || r == '_'
+	return nil, false
 }

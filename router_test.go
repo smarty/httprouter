@@ -8,38 +8,36 @@ import (
 
 func TestStaticRoutes(t *testing.T) {
 	tree := &treeNode{}
-	numOfStaticChildren := len(tree.staticChildren)
+	numOfStaticChildren := len(tree.static)
 	assertRoutes(t, tree,
 		addRoute(tree, "GET", "/"),
 		addRoute(tree, "GET", "/stuff"),
 		addRoute(tree, "GET", "/stuff/identities"),
 		addRoute(tree, "GET", "/stuff1"),
 	)
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 3)
+	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 3)
 }
-
 func TestVariableRoutes(t *testing.T) {
 	tree := &treeNode{}
-	numOfStaticChildren := len(tree.staticChildren)
+	numOfStaticChildren := len(tree.static)
 	assertRoutes(t, tree,
 		addRoute(tree, "GET", "/stuff/:id"),
 		addRoute(tree, "GET", "/stuff/identities/:id"),
 	)
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
+	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
 }
-
 func TestWildcardRoutes(t *testing.T) {
 	tree := &treeNode{}
-	numOfStaticChildren := len(tree.staticChildren)
+	numOfStaticChildren := len(tree.static)
 	assertRoutes(t, tree,
 		addRoute(tree, "GET", "/stuff/identities/*"),
 	)
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
+	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
 }
 
 func TestMethods(t *testing.T) {
 	tree := &treeNode{}
-	numOfStaticChildren := len(tree.staticChildren)
+	numOfStaticChildren := len(tree.static)
 	assertRoutes(t, tree,
 		addRoute(tree, "GET", "/stuff"),
 		addRoute(tree, "DELETE", "/stuff"),
@@ -56,47 +54,44 @@ func TestMethods(t *testing.T) {
 		addRoute(tree, "PUT", "/stuff/*"),
 		addRoute(tree, "POST", "/stuff/*"),
 	)
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
+	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
 }
-
 func TestHandlers(t *testing.T) {
 	tree := &treeNode{}
-	numOfStaticChildren := len(tree.staticChildren)
+	numOfStaticChildren := len(tree.static)
 	assertRoutes(t, tree,
 		addRoute(tree, "GET", "/stuff"),
 		addRoute(tree, "POST", "/stuff"),
 	)
 	assertNonExistingRoute(t, tree,
 		createNonExistingRoute("DELETE", "/stuff"))
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
+	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
 }
-
 func TestHandlerAlreadyExistsErr(t *testing.T) {
 	tree := &treeNode{}
-	numOfStaticChildren := len(tree.staticChildren)
+	numOfStaticChildren := len(tree.static)
 	_, err1 := addRouteWithError(tree, "GET", "/stuff")
 	_, err2 := addRouteWithError(tree, "GET", "/stuff")
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren + 1)
+	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
 	Assert(t).That(err1).Equals(nil)
-	Assert(t).That(err2).Equals(ErrMethodAlreadyExists)
+	Assert(t).That(err2).Equals(ErrRouteExists)
 }
-
 func TestMalformedRouteErr(t *testing.T) {
 	tree := &treeNode{}
-	numOfStaticChildren := len(tree.staticChildren)
+	numOfStaticChildren := len(tree.static)
 	_, err1 := addRouteWithError(tree, "GET", "//stuff")
 	_, err2 := addRouteWithError(tree, "GET", "/stu*ff")
 	_, err3 := addRouteWithError(tree, "GET", "/stu:ff")
 	_, err4 := addRouteWithError(tree, "GET", "/stuff//identities")
 	_, err5 := addRouteWithError(tree, "GET", "/stuff/*more_stuff")
 	_, err6 := addRouteWithError(tree, "GET", "stuff")
-	Assert(t).That(len(tree.staticChildren)).Equals(numOfStaticChildren)
-	Assert(t).That(err1).Equals(ErrMalformedRoute)
-	Assert(t).That(err2).Equals(ErrInvalidCharacter)
-	Assert(t).That(err3).Equals(ErrInvalidCharacter)
-	Assert(t).That(err4).Equals(ErrMalformedRoute)
-	Assert(t).That(err5).Equals(ErrInvalidWildCard)
-	Assert(t).That(err6).Equals(ErrMalformedRoute)
+	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren)
+	Assert(t).That(err1).Equals(ErrMalformedPath)
+	Assert(t).That(err2).Equals(ErrInvalidCharacters)
+	Assert(t).That(err3).Equals(ErrInvalidCharacters)
+	Assert(t).That(err4).Equals(ErrMalformedPath)
+	Assert(t).That(err5).Equals(ErrInvalidWildcard)
+	Assert(t).That(err6).Equals(ErrMalformedPath)
 }
 
 func addRoute(tree *treeNode, method, path string) fakeHandler {
