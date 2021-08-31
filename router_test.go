@@ -26,6 +26,15 @@ func TestStaticRoutes_ResolvePortionOfRoute_404(t *testing.T) {
 	Assert(t).That(handler).Equals(nil)
 	Assert(t).That(found).Equals(false)
 }
+func TestStaticRoutes_ResolvePortionOfRoute_404_TrailingSlash(t *testing.T) {
+	tree := &treeNode{}
+	addRoute(tree, "GET", "/path/to/document/")
+
+	handler, found := tree.Resolve(MethodGet, "/path/to/document")
+
+	Assert(t).That(handler).Equals(nil)
+	Assert(t).That(found).Equals(false)
+}
 func TestStaticRoutes_ResolveDifferentMethod_405(t *testing.T) {
 	tree := &treeNode{}
 	addRoute(tree, "GET", "/path/to/document")
@@ -120,7 +129,7 @@ func addRoute(tree *treeNode, method, path string) fakeHandler {
 	parsedMethod := ParseMethod(method)
 	handler := newSampleHandler(parsedMethod, path)
 
-	tree.Add(handler.Route())
+	_ = tree.Add(handler.Route())
 	return handler
 }
 func assertRoutes(t *testing.T, tree *treeNode, handlers ...fakeHandler) {
