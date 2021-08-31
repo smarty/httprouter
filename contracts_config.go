@@ -2,6 +2,13 @@ package httprouter
 
 import "net/http"
 
+func RequireNew(options ...option) http.Handler {
+	if handler, err := New(options...); err != nil {
+		panic(err)
+	} else {
+		return handler
+	}
+}
 func New(options ...option) (http.Handler, error) {
 	var config configuration
 	Options.apply(options...)(&config)
