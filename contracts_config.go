@@ -22,7 +22,7 @@ func New(options ...option) (http.Handler, error) {
 }
 
 func (singleton) Routes(value ...Route) option {
-	return func(this *configuration) { this.Routes = value } // can be empty
+	return func(this *configuration) { this.Routes = append(this.Routes, value...) } // can be empty
 }
 func (singleton) MethodNotAllowed(value http.Handler) option {
 	return func(this *configuration) { this.MethodNotAllowed = value } // must not be nil
