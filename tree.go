@@ -21,56 +21,16 @@ type treeNode struct {
 	static       []*treeNode
 	variable     *treeNode
 	wildcard     *treeNode
-	handlers     *methodMap
-	// handlers     map[Method]http.Handler
+	handlers     *methodHandlers
 }
-type methodMap struct {
-	Get    http.Handler
-	Post   http.Handler
-	Put    http.Handler
-	Delete http.Handler
-}
-
-func (this *methodMap) Resolve(method Method) (http.Handler, bool) {
-	if this == nil {
-		return nil, false
-	} else if method == MethodGet {
-		return this.Get, true
-	} else if method == MethodPost {
-		return this.Post, true
-	} else if method == MethodPut {
-		return this.Put, true
-	} else if method == MethodDelete {
-		return this.Delete, true
-	} else {
-		return nil, true
-	}
-}
-func (this *methodMap) Add(allowed Method, handler http.Handler) error {
-	// allowed is a bitmask and could be multiple
-
-	if allowed == MethodGet && this.Get != nil {
-		return ErrRouteExists // TODO: all
-	} else if allowed == MethodGet {
-		this.Get = handler
-	} else if allowed == MethodPost {
-		this.Post = handler
-	} else if allowed == MethodPut {
-		this.Put = handler
-	} else if allowed == MethodDelete {
-		this.Delete = handler
-	}
-
-	return nil // TODO: route exists
-}
-
-// FUTURE: add a "prune" function to where nodes with a single child are combined
-// this would be called after all calls to Add have been completed which would finalize the tree.
 
 func (this *treeNode) Add(route Route) error {
+	// FUTURE: add a "prune" function to where nodes with a single child are combined
+	// this would be called after all calls to Add have been completed which would finalize the tree.
+
 	if len(route.Path) == 0 {
 		if this.handlers == nil {
-			this.handlers = &methodMap{}
+			this.handlers = &methodHandlers{}
 		}
 
 		return this.handlers.Add(route.AllowedMethods, route.Handler)
@@ -209,5 +169,102 @@ func parsePathFragment(value string) string {
 		return value
 	} else {
 		return value[0:index]
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type methodHandlers struct {
+	Get     http.Handler
+	Head    http.Handler
+	Post    http.Handler
+	Put     http.Handler
+	Delete  http.Handler
+	Connect http.Handler
+	Options http.Handler
+	Trace   http.Handler
+	Patch   http.Handler
+}
+
+func (this *methodHandlers) Add(allowed Method, handler http.Handler) error {
+	if allowed&MethodGet == MethodGet && this.Get != nil {
+		return ErrRouteExists
+	} else if allowed&MethodGet == MethodGet {
+		this.Get = handler
+	}
+
+	if allowed&MethodHead == MethodHead && this.Head != nil {
+		return ErrRouteExists
+	} else if allowed&MethodHead == MethodHead {
+		this.Head = handler
+	}
+
+	if allowed&MethodPost == MethodPost && this.Post != nil {
+		return ErrRouteExists
+	} else if allowed&MethodPost == MethodPost {
+		this.Post = handler
+	}
+
+	if allowed&MethodPut == MethodPut && this.Put != nil {
+		return ErrRouteExists
+	} else if allowed&MethodPut == MethodPut {
+		this.Put = handler
+	}
+
+	if allowed&MethodDelete == MethodDelete && this.Delete != nil {
+		return ErrRouteExists
+	} else if allowed&MethodDelete == MethodDelete {
+		this.Delete = handler
+	}
+
+	if allowed&MethodConnect == MethodConnect && this.Connect != nil {
+		return ErrRouteExists
+	} else if allowed&MethodConnect == MethodConnect {
+		this.Connect = handler
+	}
+
+	if allowed&MethodOptions == MethodOptions && this.Options != nil {
+		return ErrRouteExists
+	} else if allowed&MethodOptions == MethodOptions {
+		this.Options = handler
+	}
+
+	if allowed&MethodTrace == MethodTrace && this.Trace != nil {
+		return ErrRouteExists
+	} else if allowed&MethodTrace == MethodTrace {
+		this.Trace = handler
+	}
+
+	if allowed&MethodPatch == MethodPatch && this.Patch != nil {
+		return ErrRouteExists
+	} else if allowed&MethodPatch == MethodPatch {
+		this.Patch = handler
+	}
+
+	return nil
+}
+func (this *methodHandlers) Resolve(method Method) (http.Handler, bool) {
+	if this == nil {
+		return nil, false
+	} else if method == MethodGet {
+		return this.Get, true
+	} else if method == MethodHead {
+		return this.Head, true
+	} else if method == MethodPost {
+		return this.Post, true
+	} else if method == MethodPut {
+		return this.Put, true
+	} else if method == MethodDelete {
+		return this.Delete, true
+	} else if method == MethodConnect {
+		return this.Connect, true
+	} else if method == MethodOptions {
+		return this.Options, true
+	} else if method == MethodTrace {
+		return this.Trace, true
+	} else if method == MethodPatch {
+		return this.Patch, true
+	} else {
+		return nil, true
 	}
 }
