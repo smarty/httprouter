@@ -134,18 +134,9 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 		incomingPath = incomingPath[1:]
 	}
 
-	slashIndex := strings.Index(incomingPath, "/")
-
-	var pathFragment string
-	if slashIndex == -1 {
-		pathFragment = incomingPath
-	} else {
-		pathFragment = incomingPath[0:slashIndex]
-	}
-
 	var handler http.Handler
 	var resourceExists bool
-
+	var pathFragment = parsePathFragment(incomingPath)
 	for _, staticChild := range this.static {
 		if pathFragment != staticChild.pathFragment {
 			continue
@@ -176,4 +167,11 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 	}
 
 	return nil, resourceExists
+}
+func parsePathFragment(value string) string {
+	if index := strings.Index(value, "/"); index == -1 {
+		return value
+	} else {
+		return value[0:index]
+	}
 }
