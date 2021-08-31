@@ -131,7 +131,7 @@ func hasOnlyAllowedCharacters(input string) bool {
 
 func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler, bool) {
 	if len(incomingPath) == 0 {
-		return this.handlers[method], true // the resource exists, even if no method exists
+		return this.handlers[method], len(this.handlers) > 0
 	}
 
 	if incomingPath[0] == '/' {
