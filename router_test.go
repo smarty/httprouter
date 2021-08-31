@@ -17,10 +17,30 @@ func TestStaticRoutes(t *testing.T) {
 	)
 	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 3)
 }
+func TestStaticRoutes_ResolvePortionOfRoute_404(t *testing.T) {
+	tree := &treeNode{}
+	addRoute(tree, "GET", "/path/to/document")
+
+	handler, found := tree.Resolve(MethodGet, "/path/to")
+
+	Assert(t).That(handler).Equals(nil)
+	Assert(t).That(found).Equals(false)
+}
+func TestStaticRoutes_ResolveDifferentMethod_405(t *testing.T) {
+	tree := &treeNode{}
+	addRoute(tree, "GET", "/path/to/document")
+	addRoute(tree, "PUT", "/path/to")
+
+	handler, found := tree.Resolve(MethodGet, "/path/to")
+
+	Assert(t).That(handler).Equals(nil)
+	Assert(t).That(found).Equals(true) // resource exists, but there are no handlers for it
+}
 func TestVariableRoutes(t *testing.T) {
 	tree := &treeNode{}
 	numOfStaticChildren := len(tree.static)
 	assertRoutes(t, tree,
+		addRoute(tree, "GET", "/:year/stuff/:month/:day"),
 		addRoute(tree, "GET", "/stuff/:id"),
 		addRoute(tree, "GET", "/stuff/identities/:id"),
 	)
@@ -30,6 +50,8 @@ func TestWildcardRoutes(t *testing.T) {
 	tree := &treeNode{}
 	numOfStaticChildren := len(tree.static)
 	assertRoutes(t, tree,
+		addRoute(tree, "HEAD", "/*"),
+		addRoute(tree, "PUT", "/stuff/*"),
 		addRoute(tree, "GET", "/stuff/identities/*"),
 	)
 	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
@@ -67,16 +89,16 @@ func TestHandlers(t *testing.T) {
 		createNonExistingRoute("DELETE", "/stuff"))
 	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
 }
-func TestHandlerAlreadyExistsErr(t *testing.T) {
+func TestHandlerAlreadyExists(t *testing.T) {
 	tree := &treeNode{}
 	numOfStaticChildren := len(tree.static)
 	_, err1 := addRouteWithError(tree, "GET", "/stuff")
 	_, err2 := addRouteWithError(tree, "GET", "/stuff")
 	Assert(t).That(len(tree.static)).Equals(numOfStaticChildren + 1)
-	Assert(t).That(err1).Equals(nil)
+	Assert(t).That(err1).IsNil()
 	Assert(t).That(err2).Equals(ErrRouteExists)
 }
-func TestMalformedRouteErr(t *testing.T) {
+func TestMalformedRoute(t *testing.T) {
 	tree := &treeNode{}
 	numOfStaticChildren := len(tree.static)
 	_, err1 := addRouteWithError(tree, "GET", "//stuff")
@@ -110,9 +132,7 @@ func assertRoutes(t *testing.T, tree *treeNode, handlers ...fakeHandler) {
 }
 func createNonExistingRoute(method, path string) fakeHandler {
 	parsedMethod := ParseMethod(method)
-	handler := newSampleHandler(parsedMethod, path)
-
-	return handler
+	return newSampleHandler(parsedMethod, path)
 }
 func addRouteWithError(tree *treeNode, method, path string) (fakeHandler, error) {
 	parsedMethod := ParseMethod(method)
@@ -125,7 +145,25 @@ func assertNonExistingRoute(t *testing.T, tree *treeNode, handlers ...fakeHandle
 	for _, handler := range handlers {
 		route := handler.Route()
 		resolved, _ := tree.Resolve(route.AllowedMethod, route.Path)
-		Assert(t).That(resolved).Equals(nil)
+		Assert(t).That(resolved).IsNil()
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func BenchmarkTreeStatic(b *testing.B) {
+	tree := &treeNode{}
+	addRoute(tree, "GET", "/")
+	addRoute(tree, "GET", "/stuff")
+	addRoute(tree, "GET", "/stuff/identities")
+	addRoute(tree, "GET", "/stuff/identities/long/path")
+	addRoute(tree, "GET", "/stuff1")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = tree.Resolve(MethodGet, "/stuff/identities/long/path") // slows down as it gets longer
 	}
 }
 

@@ -24,6 +24,9 @@ type treeNode struct {
 	handlers     map[Method]http.Handler
 }
 
+// FUTURE: add a "prune" function to where nodes with a single child are combined
+// this would be called after all calls to Add have been completed which would finalize the tree.
+
 func (this *treeNode) Add(route Route) error {
 	if len(route.Path) == 0 {
 		if _, contains := this.handlers[route.AllowedMethod]; contains {
@@ -144,6 +147,9 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 		pathFragment = incomingPath[0:slashIndex]
 	}
 
+	var handler http.Handler
+	var resourceExists bool
+
 	for _, staticChild := range this.static {
 		if pathFragment != staticChild.pathFragment {
 			continue
@@ -151,7 +157,7 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 
 		// the path fragment DOES match...
 		remainingPath := incomingPath[len(staticChild.pathFragment):]
-		if handler, resourceExists := staticChild.Resolve(method, remainingPath); handler != nil {
+		if handler, resourceExists = staticChild.Resolve(method, remainingPath); handler != nil {
 			return handler, resourceExists
 		}
 
@@ -161,7 +167,7 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 	if this.variable != nil {
 		if strings.HasPrefix(incomingPath, this.variable.pathFragment) {
 			remainingPath := incomingPath[len(this.variable.pathFragment):]
-			if handler, resourceExists := this.variable.Resolve(method, remainingPath); handler != nil {
+			if handler, resourceExists = this.variable.Resolve(method, remainingPath); handler != nil {
 				return handler, resourceExists
 			}
 		}
@@ -173,5 +179,5 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 		}
 	}
 
-	return nil, false
+	return nil, resourceExists
 }
