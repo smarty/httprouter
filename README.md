@@ -5,49 +5,45 @@ How to Use:
 package main
 
 import (
-   "net/http"
-   
-   "github.com/smartystreets/httprouter"
+    "net/http"
+
+    "github.com/smartystreets/httprouter"
 )
 
 func main() {
-    var routes []httprouter.Routes
+    var routes []httprouter.Route
 
     var createUserHandler http.Handler = nil // initialize this
     var userHandler http.Handler = nil       // initialize this
-    routes = append(routes, httprouter.ParseRoutes("PUT", "/users", createUserHandler))
-    routes = append(routes, httprouter.ParseRoutes("GET|DELETE", "/users/:id", userHandler))
-    
-    var profileRouteHandler http.Handler = nil // initialize this
-    routes = append(routes, httprouter.ParseRoutes("POST", "/users/*", profileRouteHandler))
+    routes = append(routes, httprouter.ParseRoutes("PUT", "/users|/old/path/to/users", createUserHandler)...)
+    routes = append(routes, httprouter.ParseRoutes("GET|DELETE", "/users/:id", userHandler)...)
 
-    router := httprouter.New(
-        httprouter.Options.Route(routes...),
+    var profileRouteHandler http.Handler = nil // initialize this
+    routes = append(routes, httprouter.ParseRoutes("POST", "/users/*", profileRouteHandler)...)
+
+    router, err := httprouter.New(
+        httprouter.Options.Routes(routes...),
         httprouter.Options.MethodNotAllowed(&customMethodNotAllowedHandler{}), // optional
         httprouter.Options.NotFound(&customNotFoundHandler{}),                 // optional
         httprouter.Options.Recovery(panicRecovery),                            // optional
         httprouter.Options.Monitor(&routingMonitor{}))                         // optional
 
+    if err != nil {
+        panic(err)
+    }
+
     _ = http.ListenAndServe("127.0.0.1:8080", router)
 }
 
-type customMethodNotAllowedHandler struct {}
-func (this *notFoundHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {}
+type customMethodNotAllowedHandler struct{}
+type customNotFoundHandler struct{}
+type routingMonitor struct{}
 
-
-type customNotFoundHandler struct {}
-func (this *customNotFoundHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {}
-
-
-func panicRecovery(response http.ResponseWriter, request *http.Request, recovered interface{}) {
-}
-
-type routingMonitor struct {
-
-func (*routingMonitor) Routed(*http.Request)                 {}
-func (*routingMonitor) NotFound(*http.Request)               {}
-func (*routingMonitor) MethodNotAllowed(*http.Request)       {}
-func (*routingMonitor) Recovered(*http.Request, interface{}) {}
-
-
+func (this *customMethodNotAllowedHandler) ServeHTTP(http.ResponseWriter, *http.Request) {}
+func (this *customNotFoundHandler) ServeHTTP(http.ResponseWriter, *http.Request)         {}
+func (*routingMonitor) Routed(*http.Request)                                             {}
+func (*routingMonitor) NotFound(*http.Request)                                           {}
+func (*routingMonitor) MethodNotAllowed(*http.Request)                                   {}
+func (*routingMonitor) Recovered(*http.Request, interface{})                             {}
+func panicRecovery(http.ResponseWriter, *http.Request, interface{})                      {}
 ```
