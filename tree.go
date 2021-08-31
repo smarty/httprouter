@@ -21,7 +21,47 @@ type treeNode struct {
 	static       []*treeNode
 	variable     *treeNode
 	wildcard     *treeNode
-	handlers     map[Method]http.Handler
+	handlers     *methodMap
+	// handlers     map[Method]http.Handler
+}
+type methodMap struct {
+	Get    http.Handler
+	Post   http.Handler
+	Put    http.Handler
+	Delete http.Handler
+}
+
+func (this *methodMap) Resolve(method Method) (http.Handler, bool) {
+	if this == nil {
+		return nil, false
+	} else if method == MethodGet {
+		return this.Get, true
+	} else if method == MethodPost {
+		return this.Post, true
+	} else if method == MethodPut {
+		return this.Put, true
+	} else if method == MethodDelete {
+		return this.Delete, true
+	} else {
+		return nil, true
+	}
+}
+func (this *methodMap) Add(allowed Method, handler http.Handler) error {
+	// allowed is a bitmask and could be multiple
+
+	if allowed == MethodGet && this.Get != nil {
+		return ErrRouteExists // TODO: all
+	} else if allowed == MethodGet {
+		this.Get = handler
+	} else if allowed == MethodPost {
+		this.Post = handler
+	} else if allowed == MethodPut {
+		this.Put = handler
+	} else if allowed == MethodDelete {
+		this.Delete = handler
+	}
+
+	return nil // TODO: route exists
 }
 
 // FUTURE: add a "prune" function to where nodes with a single child are combined
@@ -29,7 +69,11 @@ type treeNode struct {
 
 func (this *treeNode) Add(route Route) error {
 	if len(route.Path) == 0 {
-		return this.attachHandler(route.AllowedMethod, route.Handler)
+		if this.handlers == nil {
+			this.handlers = &methodMap{}
+		}
+
+		return this.handlers.Add(route.AllowedMethods, route.Handler)
 	}
 
 	if route.Path[0] == '/' {
@@ -62,21 +106,13 @@ func (this *treeNode) Add(route Route) error {
 
 	return this.addStatic(route, pathFragmentForChildNode)
 }
-func (this *treeNode) attachHandler(allowed Method, handler http.Handler) error {
-	if _, contains := this.handlers[allowed]; contains {
-		return ErrRouteExists
-	}
-
-	this.handlers[allowed] = handler
-	return nil
-}
 func (this *treeNode) addWildcard(route Route, pathFragment string) error {
 	if len(route.Path) > 1 {
 		return ErrInvalidWildcard // must only be "*"
 	}
 
 	if this.wildcard == nil {
-		this.wildcard = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
+		this.wildcard = &treeNode{pathFragment: pathFragment}
 	}
 
 	route.Path = ""
@@ -84,7 +120,7 @@ func (this *treeNode) addWildcard(route Route, pathFragment string) error {
 }
 func (this *treeNode) addVariable(route Route, pathFragment string) error {
 	if this.variable == nil {
-		this.variable = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
+		this.variable = &treeNode{pathFragment: pathFragment}
 	}
 
 	route.Path = route.Path[len(pathFragment):]
@@ -99,7 +135,7 @@ func (this *treeNode) addStatic(route Route, pathFragment string) (err error) {
 		}
 	}
 
-	staticChild := &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
+	staticChild := &treeNode{pathFragment: pathFragment}
 	if err = staticChild.Add(route); err != nil {
 		return err
 	}
@@ -127,7 +163,7 @@ func hasOnlyAllowedCharacters(input string) bool {
 
 func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler, bool) {
 	if len(incomingPath) == 0 {
-		return this.handlers[method], len(this.handlers) > 0
+		return this.handlers.Resolve(method)
 	}
 
 	if incomingPath[0] == '/' {
