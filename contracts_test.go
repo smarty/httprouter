@@ -22,12 +22,12 @@ func assertParsedMethods(t *testing.T, raw string, expected Method) {
 
 func TestParseRoutes(t *testing.T) {
 	assertParsedRoutes(t, "GET|PUT", "/resource|/another/resource",
-		Route{AllowedMethod: MethodGet | MethodPut, Path: "/resource"},
-		Route{AllowedMethod: MethodGet | MethodPut, Path: "/another/resource"})
+		Route{AllowedMethods: MethodGet | MethodPut, Path: "/resource"},
+		Route{AllowedMethods: MethodGet | MethodPut, Path: "/another/resource"})
 
 	assertParsedRoutes(t, "HEAD|OPTIONS", " \n\t  /Path/To/Document | \n\t /Document/* \t\n",
-		Route{AllowedMethod: MethodHead | MethodOptions, Path: "/Path/To/Document"},
-		Route{AllowedMethod: MethodHead | MethodOptions, Path: "/Document/*"})
+		Route{AllowedMethods: MethodHead | MethodOptions, Path: "/Path/To/Document"},
+		Route{AllowedMethods: MethodHead | MethodOptions, Path: "/Document/*"})
 
 	route := ParseRoute("GET|HEAD", "/document", nil)
 	Assert(t).That(route.String()).Equals("GET|HEAD /document")
