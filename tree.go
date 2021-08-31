@@ -11,7 +11,7 @@ type treeNode struct {
 	static       []*treeNode
 	variable     *treeNode
 	wildcard     *treeNode
-	registered   *methodHandlers
+	handlers     *methodHandlers
 }
 
 func (this *treeNode) Add(route Route) error {
@@ -19,11 +19,11 @@ func (this *treeNode) Add(route Route) error {
 	// this would be called after all calls to Add have been completed which would finalize the tree.
 
 	if len(route.Path) == 0 {
-		if this.registered == nil {
-			this.registered = &methodHandlers{}
+		if this.handlers == nil {
+			this.handlers = &methodHandlers{}
 		}
 
-		return this.registered.Add(route.AllowedMethods, route.Handler)
+		return this.handlers.Add(route.AllowedMethods, route.Handler)
 	}
 
 	if route.Path[0] == '/' {
@@ -113,7 +113,11 @@ func hasOnlyAllowedCharacters(input string) bool {
 
 func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler, bool) {
 	if len(incomingPath) == 0 {
-		return this.registered.Resolve(method)
+		if this.handlers == nil {
+			return nil, false
+		} else {
+			return this.handlers.Resolve(method), true
+		}
 	}
 
 	if incomingPath[0] == '/' {
@@ -233,28 +237,26 @@ func (this *methodHandlers) Add(allowed Method, handler http.Handler) error {
 
 	return nil
 }
-func (this *methodHandlers) Resolve(method Method) (http.Handler, bool) {
-	if this == nil {
-		return nil, false
-	} else if method == MethodGet {
-		return this.Get, true
+func (this *methodHandlers) Resolve(method Method) http.Handler {
+	if method == MethodGet {
+		return this.Get
 	} else if method == MethodHead {
-		return this.Head, true
+		return this.Head
 	} else if method == MethodPost {
-		return this.Post, true
+		return this.Post
 	} else if method == MethodPut {
-		return this.Put, true
+		return this.Put
 	} else if method == MethodDelete {
-		return this.Delete, true
+		return this.Delete
 	} else if method == MethodConnect {
-		return this.Connect, true
+		return this.Connect
 	} else if method == MethodOptions {
-		return this.Options, true
+		return this.Options
 	} else if method == MethodTrace {
-		return this.Trace, true
+		return this.Trace
 	} else if method == MethodPatch {
-		return this.Patch, true
+		return this.Patch
 	} else {
-		return nil, true
+		return nil
 	}
 }
