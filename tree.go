@@ -41,9 +41,7 @@ func (this *treeNode) Add(route Route) error {
 	var pathFragmentForChildNode string
 	slashIndex := strings.Index(route.Path, "/")
 	if slashIndex == 0 {
-		// first character is a slash, that means the URL provided looks something like this:
-		// /path/to//document # note the double slash
-		return ErrMalformedPath
+		return ErrMalformedPath // first character is a slash, that means the URL provided looks something like this: /path/to//document (note the double slash)
 	} else if slashIndex == -1 {
 		pathFragmentForChildNode = route.Path
 	} else {
@@ -73,26 +71,23 @@ func (this *treeNode) attachHandler(allowed Method, handler http.Handler) error 
 	return nil
 }
 func (this *treeNode) addWildcard(route Route, pathFragment string) error {
-	// validate incoming route.Path (must only be "*")
 	if len(route.Path) > 1 {
-		return ErrInvalidWildcard
+		return ErrInvalidWildcard // must only be "*"
 	}
-
-	route.Path = "" // now truncate it to ""
 
 	if this.wildcard == nil {
 		this.wildcard = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	}
 
+	route.Path = ""
 	return this.wildcard.Add(route)
 }
 func (this *treeNode) addVariable(route Route, pathFragment string) error {
-	route.Path = route.Path[len(pathFragment):]
-
 	if this.variable == nil {
 		this.variable = &treeNode{pathFragment: pathFragment, handlers: map[Method]http.Handler{}}
 	}
 
+	route.Path = route.Path[len(pathFragment):]
 	return this.variable.Add(route)
 }
 func (this *treeNode) addStatic(route Route, pathFragment string) (err error) {
