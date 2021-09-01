@@ -1,6 +1,9 @@
 package httprouter
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 type defaultRouter struct {
 	resolver         routeResolver
@@ -18,7 +21,12 @@ func (this *defaultRouter) ServeHTTP(response http.ResponseWriter, request *http
 func (this *defaultRouter) resolve(request *http.Request) http.Handler {
 	method := availableMethods[request.Method]
 
-	if handler, resolved := this.resolver.Resolve(method, request.RequestURI); handler != nil {
+	rawPath := request.RequestURI
+	if index := strings.Index(rawPath, "?"); index >= 0 {
+		rawPath = rawPath[0:index]
+	}
+
+	if handler, resolved := this.resolver.Resolve(method, rawPath); handler != nil {
 		this.monitor.Routed(request)
 		return handler
 	} else if resolved {
