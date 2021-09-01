@@ -15,8 +15,9 @@ type treeNode struct {
 }
 
 func (this *treeNode) Add(route Route) error {
-	// FUTURE: add a "prune" function to where nodes with a single child are combined
-	// this would be called after all calls to Add have been completed which would finalize the tree.
+	if route.AllowedMethods == MethodNone {
+		return ErrUnknownMethod
+	}
 
 	if len(route.Path) == 0 {
 		if this.handlers == nil {
@@ -121,7 +122,8 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 	}
 
 	var handler http.Handler
-	var resourceExists bool
+	var staticResourceExists, variableResourceExists bool
+
 	var pathFragment = parsePathFragment(incomingPath)
 	for _, staticChild := range this.static {
 		if pathFragment != staticChild.pathFragment {
@@ -130,8 +132,8 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 
 		// the path fragment DOES match...
 		remainingPath := incomingPath[len(staticChild.pathFragment):]
-		if handler, resourceExists = staticChild.Resolve(method, remainingPath); handler != nil {
-			return handler, resourceExists
+		if handler, staticResourceExists = staticChild.Resolve(method, remainingPath); handler != nil {
+			return handler, staticResourceExists
 		}
 
 		break // don't bother checking any more of siblings of the static child, they don't match
@@ -139,8 +141,8 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 
 	if this.variable != nil {
 		remainingPath := incomingPath[len(pathFragment):]
-		if handler, resourceExists = this.variable.Resolve(method, remainingPath); handler != nil {
-			return handler, resourceExists
+		if handler, variableResourceExists = this.variable.Resolve(method, remainingPath); handler != nil {
+			return handler, variableResourceExists
 		}
 	}
 
@@ -148,7 +150,7 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 		return this.wildcard.Resolve(method, "")
 	}
 
-	return nil, resourceExists
+	return nil, staticResourceExists || variableResourceExists
 }
 func parsePathFragment(value string) string {
 	if index := strings.Index(value, "/"); index == -1 {

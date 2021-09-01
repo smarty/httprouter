@@ -22,7 +22,9 @@ func (this *defaultRouter) resolve(request *http.Request) http.Handler {
 	method := availableMethods[request.Method]
 
 	rawPath := request.RequestURI
-	if index := strings.Index(rawPath, "?"); index >= 0 {
+	if len(rawPath) == 0 {
+		rawPath = request.URL.Path
+	} else if index := strings.Index(rawPath, "?"); index >= 0 {
 		rawPath = rawPath[0:index]
 	}
 

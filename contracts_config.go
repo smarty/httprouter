@@ -15,6 +15,8 @@ func New(options ...option) (http.Handler, error) {
 
 	treeRoot := &treeNode{}
 	for _, route := range config.Routes {
+		// FUTURE: add a "prune" function to where nodes with a single child are combined
+		// this would be called after all calls to Add have been completed which would finalize the tree.
 		if err := treeRoot.Add(route); err != nil {
 			return nil, err
 		}
@@ -28,6 +30,9 @@ func New(options ...option) (http.Handler, error) {
 	return newRecoveryRouter(router, config.Recovery, config.Monitor), nil
 }
 
+func (singleton) AddRoute(method, path string, handler http.Handler) option {
+	return func(this *configuration) { this.Routes = append(this.Routes, ParseRoutes(method, path, handler)...) }
+}
 func (singleton) Routes(value ...Route) option {
 	return func(this *configuration) { this.Routes = append(this.Routes, value...) } // can be empty
 }
