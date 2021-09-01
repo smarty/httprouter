@@ -44,25 +44,21 @@ func (this *treeNode) Add(route Route) error {
 
 	if !hasOnlyAllowedCharacters(pathFragmentForChildNode) {
 		return ErrInvalidCharacters
-	}
-
-	if strings.HasPrefix(pathFragmentForChildNode, "*") {
+	} else if strings.HasPrefix(pathFragmentForChildNode, "*") {
 		return this.addWildcard(route, pathFragmentForChildNode)
-	}
-
-	if strings.HasPrefix(pathFragmentForChildNode, ":") {
+	} else if strings.HasPrefix(pathFragmentForChildNode, ":") {
 		return this.addVariable(route, pathFragmentForChildNode)
+	} else {
+		return this.addStatic(route, pathFragmentForChildNode)
 	}
-
-	return this.addStatic(route, pathFragmentForChildNode)
 }
 func (this *treeNode) addWildcard(route Route, pathFragment string) error {
-	if len(route.Path) > 1 {
-		return ErrInvalidWildcard // must only be "*"
-	}
-
 	if this.wildcard == nil {
 		this.wildcard = &treeNode{pathFragment: pathFragment}
+	}
+
+	if len(route.Path) > 1 {
+		return ErrInvalidWildcard // must only be "*"
 	}
 
 	route.Path = ""
