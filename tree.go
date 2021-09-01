@@ -232,25 +232,26 @@ func (this *methodHandlers) Add(allowed Method, handler http.Handler) error {
 	return nil
 }
 func (this *methodHandlers) Resolve(method string) http.Handler {
-	if method == http.MethodGet {
+	switch method {
+	case http.MethodGet:
 		return this.Get
-	} else if method == http.MethodHead {
+	case http.MethodHead:
 		return this.Head
-	} else if method == http.MethodPost {
+	case http.MethodPost:
 		return this.Post
-	} else if method == http.MethodPut {
+	case http.MethodPut:
 		return this.Put
-	} else if method == http.MethodDelete {
+	case http.MethodDelete:
 		return this.Delete
-	} else if method == http.MethodConnect {
+	case http.MethodConnect:
 		return this.Connect
-	} else if method == http.MethodOptions {
+	case http.MethodOptions:
 		return this.Options
-	} else if method == http.MethodTrace {
+	case http.MethodTrace:
 		return this.Trace
-	} else if method == http.MethodPatch {
+	case http.MethodPatch:
 		return this.Patch
-	} else {
+	default:
 		return nil
 	}
 }
