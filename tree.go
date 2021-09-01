@@ -142,18 +142,14 @@ func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler,
 	}
 
 	if this.variable != nil {
-		if strings.HasPrefix(incomingPath, this.variable.pathFragment) {
-			remainingPath := incomingPath[len(this.variable.pathFragment):]
-			if handler, resourceExists = this.variable.Resolve(method, remainingPath); handler != nil {
-				return handler, resourceExists
-			}
+		remainingPath := incomingPath[len(pathFragment):]
+		if handler, resourceExists = this.variable.Resolve(method, remainingPath); handler != nil {
+			return handler, resourceExists
 		}
 	}
 
 	if this.wildcard != nil {
-		if strings.HasPrefix(incomingPath, this.wildcard.pathFragment) {
-			return this.wildcard.Resolve(method, "") // wildcard matches everything, don't bother with the path
-		}
+		return this.wildcard.Resolve(method, "")
 	}
 
 	return nil, resourceExists
