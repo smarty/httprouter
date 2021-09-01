@@ -108,7 +108,7 @@ func hasOnlyAllowedCharacters(input string) bool {
 	return true
 }
 
-func (this *treeNode) Resolve(method Method, incomingPath string) (http.Handler, bool) {
+func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, bool) {
 	if len(incomingPath) == 0 {
 		if this.handlers == nil {
 			return nil, false
@@ -231,24 +231,24 @@ func (this *methodHandlers) Add(allowed Method, handler http.Handler) error {
 
 	return nil
 }
-func (this *methodHandlers) Resolve(method Method) http.Handler {
-	if method == MethodGet {
+func (this *methodHandlers) Resolve(method string) http.Handler {
+	if method == http.MethodGet {
 		return this.Get
-	} else if method == MethodHead {
+	} else if method == http.MethodHead {
 		return this.Head
-	} else if method == MethodPost {
+	} else if method == http.MethodPost {
 		return this.Post
-	} else if method == MethodPut {
+	} else if method == http.MethodPut {
 		return this.Put
-	} else if method == MethodDelete {
+	} else if method == http.MethodDelete {
 		return this.Delete
-	} else if method == MethodConnect {
+	} else if method == http.MethodConnect {
 		return this.Connect
-	} else if method == MethodOptions {
+	} else if method == http.MethodOptions {
 		return this.Options
-	} else if method == MethodTrace {
+	} else if method == http.MethodTrace {
 		return this.Trace
-	} else if method == MethodPatch {
+	} else if method == http.MethodPatch {
 		return this.Patch
 	} else {
 		return nil

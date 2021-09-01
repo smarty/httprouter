@@ -132,7 +132,7 @@ func TestStaticRoutes_ResolvePortionOfRoute_404(t *testing.T) {
 	tree := &treeNode{}
 	addRoute(tree, "GET", "/path/to/document")
 
-	handler, found := tree.Resolve(MethodGet, "/path/to")
+	handler, found := tree.Resolve("GET", "/path/to")
 
 	Assert(t).That(handler).Equals(nil)
 	Assert(t).That(found).Equals(false)
@@ -141,7 +141,7 @@ func TestStaticRoutes_ResolvePortionOfRoute_404_TrailingSlash(t *testing.T) {
 	tree := &treeNode{}
 	addRoute(tree, "GET", "/path/to/document/")
 
-	handler, found := tree.Resolve(MethodGet, "/path/to/document")
+	handler, found := tree.Resolve("GET", "/path/to/document")
 
 	Assert(t).That(handler).Equals(nil)
 	Assert(t).That(found).Equals(false)
@@ -151,7 +151,7 @@ func TestStaticRoutes_ResolveDifferentMethod_405(t *testing.T) {
 	addRoute(tree, "GET", "/path/to/document")
 	addRoute(tree, "PUT", "/path/to")
 
-	handler, found := tree.Resolve(MethodGet, "/path/to")
+	handler, found := tree.Resolve("GET", "/path/to")
 
 	Assert(t).That(handler).Equals(nil)
 	Assert(t).That(found).Equals(true) // resource exists, but there are no handlers for it
@@ -161,7 +161,7 @@ func TestRoutes_Variable(t *testing.T) {
 	tree := &treeNode{}
 	expected := addRoute(tree, "GET", "/path/:id")
 
-	handler, found := tree.Resolve(MethodGet, "/path/document")
+	handler, found := tree.Resolve("GET", "/path/document")
 
 	Assert(t).That(handler).Equals(expected)
 	Assert(t).That(found).Equals(true) // resource exists, but there are no handlers for it
@@ -170,7 +170,7 @@ func TestRoutes_Wildcard(t *testing.T) {
 	tree := &treeNode{}
 	expected := addRoute(tree, "GET", "/path/*")
 
-	handler, found := tree.Resolve(MethodGet, "/path/document")
+	handler, found := tree.Resolve("GET", "/path/document")
 
 	Assert(t).That(handler).Equals(expected)
 	Assert(t).That(found).Equals(true) // resource exists, but there are no handlers for it
@@ -268,7 +268,7 @@ func assertRoutes(t *testing.T, tree *treeNode, handlers ...fakeHandler) {
 
 	for _, handler := range handlers {
 		route := handler.Route()
-		resolved, _ := tree.Resolve(route.AllowedMethods, route.Path)
+		resolved, _ := tree.Resolve(route.AllowedMethods.String(), route.Path)
 		Assert(t).That(resolved).Equals(handler)
 	}
 }
@@ -288,7 +288,7 @@ func assertNonExistingRoute(t *testing.T, tree *treeNode, handlers ...fakeHandle
 
 	for _, handler := range handlers {
 		route := handler.Route()
-		resolved, _ := tree.Resolve(route.AllowedMethods, route.Path)
+		resolved, _ := tree.Resolve(route.AllowedMethods.String(), route.Path)
 		Assert(t).That(resolved).IsNil()
 	}
 }
@@ -307,7 +307,7 @@ func BenchmarkTreeStatic(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _ = tree.Resolve(MethodGet, "/") // slows down as it gets longer
+		_, _ = tree.Resolve("GET", "/") // slows down as the node traversal gets longer
 	}
 }
 func BenchmarkRouter(b *testing.B) {

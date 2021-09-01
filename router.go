@@ -19,8 +19,6 @@ func (this *defaultRouter) ServeHTTP(response http.ResponseWriter, request *http
 	this.resolve(request).ServeHTTP(response, request)
 }
 func (this *defaultRouter) resolve(request *http.Request) http.Handler {
-	method := availableMethods[request.Method]
-
 	rawPath := request.RequestURI
 	if len(rawPath) == 0 {
 		rawPath = request.URL.Path
@@ -28,7 +26,7 @@ func (this *defaultRouter) resolve(request *http.Request) http.Handler {
 		rawPath = rawPath[0:index]
 	}
 
-	if handler, resolved := this.resolver.Resolve(method, rawPath); handler != nil {
+	if handler, resolved := this.resolver.Resolve(request.Method, rawPath); handler != nil {
 		this.monitor.Routed(request)
 		return handler
 	} else if resolved {
