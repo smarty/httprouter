@@ -131,7 +131,7 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, bool) 
 		}
 
 		// the path fragment DOES match...
-		remainingPath := incomingPath[len(staticChild.pathFragment):]
+		remainingPath := incomingPath[len(pathFragment):]
 		if handler, staticResourceExists = staticChild.Resolve(method, remainingPath); handler != nil {
 			return handler, staticResourceExists
 		}
