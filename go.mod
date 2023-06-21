@@ -1,3 +1,3 @@
-module github.com/smartystreets/httprouter
+module github.com/smarty/httprouter
 
 go 1.17

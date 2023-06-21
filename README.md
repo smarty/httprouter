@@ -9,7 +9,7 @@ package main
 import (
     "net/http"
 
-    "github.com/smartystreets/httprouter"
+    "github.com/smarty/httprouter"
 )
 
 func main() {
