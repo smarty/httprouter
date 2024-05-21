@@ -249,9 +249,7 @@ func (this *methodHandlers) Resolve(method string) http.Handler {
 		return this.Options
 	case http.MethodTrace:
 		return this.Trace
-	case http.MethodPatch:
-		return this.Patch
 	default:
-		return nil
+		return this.Patch
 	}
 }

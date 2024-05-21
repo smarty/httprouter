@@ -1,6 +1,7 @@
 package httprouter
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -23,13 +24,13 @@ func TestRouting(t *testing.T) {
 			ParseRoute("PUT      ", "/:var1/:var2/test3/path/to/document", simpleHandler("8")),
 			ParseRoute("GET      ", "/:var1/another/path/to/document    ", simpleHandler("9")),
 
-			ParseRoute("GET      ", "/test4  ", simpleHandler("10")),
-			ParseRoute("GET      ", "/test4/ ", simpleHandler("11")),
-			ParseRoute("GET      ", "/test4/*", simpleHandler("12")),
+			ParseRoute("CONNECT  ", "/test4  ", simpleHandler("10")),
+			ParseRoute("CONNECT  ", "/test4/ ", simpleHandler("11")),
+			ParseRoute("CONNECT  ", "/test4/*", simpleHandler("12")),
 
-			ParseRoute("GET      ", "/test5/static/child/:variable/grandchild", simpleHandler("13")),
-			ParseRoute("GET      ", "/test5/:variable/child/static/grandchild", simpleHandler("14")),
-			ParseRoute("GET      ", "/test5/:variable/child/*                ", simpleHandler("15")),
+			ParseRoute("TRACE    ", "/test5/static/child/:variable/grandchild", simpleHandler("13")),
+			ParseRoute("TRACE    ", "/test5/:variable/child/static/grandchild", simpleHandler("14")),
+			ParseRoute("TRACE    ", "/test5/:variable/child/*                ", simpleHandler("15")),
 
 			ParseRoute("GET      ", "/test5/:variable-1/:variable-2/:variable-3/static", simpleHandler("16")),
 			ParseRoute("GET      ", "/test5/:variable-1/:variable-2/static/child      ", simpleHandler("17")),
@@ -55,16 +56,16 @@ func TestRouting(t *testing.T) {
 
 	assertRoute(t, router, "GET    ", "/variable1/variable1/test3/path/to/document", 200, "7")
 
-	assertRoute(t, router, "GET    ", "/test4         ", 200, "10")
+	assertRoute(t, router, "CONNECT", "/test4         ", 200, "10")
 	assertRoute(t, router, "HEAD   ", "/test4         ", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "GET    ", "/test4/        ", 200, "11")
-	assertRoute(t, router, "GET    ", "/test4/wildcard", 200, "12")
+	assertRoute(t, router, "CONNECT", "/test4/        ", 200, "11")
+	assertRoute(t, router, "CONNECT", "/test4/wildcard", 200, "12")
 	assertRoute(t, router, "DELETE ", "/test4/wildcard", 405, "Method Not Allowed\n")
 
-	assertRoute(t, router, "GET    ", "/test5/static/child/variable-name-here/grandchild               ", 200, "13")
-	assertRoute(t, router, "GET    ", "/test5/static/child/variable-name-here/grandchild/does-not-exist", 200, "15") // greedy wildcard
-	assertRoute(t, router, "GET    ", "/test5/variable-name-here/child/static/grandchild               ", 200, "14")
-	assertRoute(t, router, "GET    ", "/test5/variable-name-here/child/wildcard                        ", 200, "15")
+	assertRoute(t, router, "TRACE  ", "/test5/static/child/variable-name-here/grandchild               ", 200, "13")
+	assertRoute(t, router, "TRACE  ", "/test5/static/child/variable-name-here/grandchild/does-not-exist", 200, "15") // greedy wildcard
+	assertRoute(t, router, "TRACE  ", "/test5/variable-name-here/child/static/grandchild               ", 200, "14")
+	assertRoute(t, router, "TRACE  ", "/test5/variable-name-here/child/wildcard                        ", 200, "15")
 
 	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 200, "16")
 	assertRoute(t, router, "DELETE ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 405, "Method Not Allowed\n")
@@ -72,19 +73,33 @@ func TestRouting(t *testing.T) {
 }
 func assertRoute(t *testing.T, router http.Handler, method, path string, expectedStatus int, expectedBody string) {
 	t.Helper()
+	t.Run(fmt.Sprintf("%s:%s:%d", method, path, expectedStatus), func(t *testing.T) {
+		t.Helper()
 
-	request := httptest.NewRequest(strings.TrimSpace(method), strings.TrimSpace(path)+"?query=value#hash", nil)
-	recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(strings.TrimSpace(method), strings.TrimSpace(path)+"?query=value#hash", nil)
+		recorder := httptest.NewRecorder()
 
-	router.ServeHTTP(recorder, request)
+		router.ServeHTTP(recorder, request)
 
-	if recorder.Code != expectedStatus {
-		t.Errorf("expected status [%d], actual status: [%d] for test [%s %s]", expectedStatus, recorder.Code, method, path)
-	} else {
-		actualBody := recorder.Body.String()
-		if actualBody != expectedBody {
-			t.Errorf("expected body [%s], actual body: [%s] for test [%s %s]", expectedBody, actualBody, method, path)
+		if recorder.Code != expectedStatus {
+			t.Errorf("expected status [%d], actual status: [%d] for test [%s %s]", expectedStatus, recorder.Code, method, path)
+		} else {
+			actualBody := recorder.Body.String()
+			if actualBody != expectedBody {
+				t.Errorf("expected body [%s], actual body: [%s] for test [%s %s]", expectedBody, actualBody, method, path)
+			}
 		}
+	})
+}
+
+func TestFallbackToURL(t *testing.T) {
+	router := RequireNew(Options.AddRoute("GET", "/", simpleHandler(t.Name())))
+	request := httptest.NewRequest("GET", "/", nil)
+	request.RequestURI = "" // causes fallback to request.URL
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Errorf("expected status [%d], actual status: [%d]", http.StatusOK, recorder.Code)
 	}
 }
 
@@ -112,11 +127,24 @@ func TestRequireNew_WillPanic(t *testing.T) {
 }
 
 func TestRouteAlreadyExists(t *testing.T) {
-	tree := &treeNode{}
-	_, err1 := addRouteWithError(tree, "GET", "/stuff")
-	_, err2 := addRouteWithError(tree, "GET", "/stuff")
-	Assert(t).That(err1).IsNil()
-	Assert(t).That(err2).Equals(ErrRouteExists)
+	assertRouteAlreadyExists(t, "GET")
+	assertRouteAlreadyExists(t, "HEAD")
+	assertRouteAlreadyExists(t, "POST")
+	assertRouteAlreadyExists(t, "PUT")
+	assertRouteAlreadyExists(t, "DELETE")
+	assertRouteAlreadyExists(t, "CONNECT")
+	assertRouteAlreadyExists(t, "OPTIONS")
+	assertRouteAlreadyExists(t, "TRACE")
+	assertRouteAlreadyExists(t, "PATCH")
+}
+func assertRouteAlreadyExists(t *testing.T, method string) {
+	t.Run(method, func(t *testing.T) {
+		tree := &treeNode{}
+		_, err1 := addRouteWithError(tree, method, "/stuff")
+		_, err2 := addRouteWithError(tree, method, "/stuff")
+		Assert(t).That(err1).IsNil()
+		Assert(t).That(err2).Equals(ErrRouteExists)
+	})
 }
 func TestMalformedRouteRegistration(t *testing.T) {
 	tree := &treeNode{}
