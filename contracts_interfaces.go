@@ -2,6 +2,7 @@ package httprouter
 
 import "net/http"
 
+// Deprecated
 type Resolver interface {
 	Resolve(method, path string) http.Handler
 }
