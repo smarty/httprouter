@@ -9,77 +9,71 @@ import (
 )
 
 func TestRouting(t *testing.T) {
-	var routes []Route
-	for _, registration := range []struct{ AllowedMethods, Path, Body string }{
-		{"GET|HEAD ", "/test1/path/to/document", "1"},
-		{"POST     ", "/test1/path/to/document", "2"},
-		{"DELETE   ", "/test1/path/to/document", "3"},
+	router := RequireNew(
+		Options.Routes(
+			ParseRoute("GET|HEAD ", "/test1/path/to/document", simpleHandler("1")),
+			ParseRoute("POST     ", "/test1/path/to/document", simpleHandler("2")),
+			ParseRoute("DELETE   ", "/test1/path/to/document", simpleHandler("3")),
 
-		{"GET      ", "/test2/*", "4"},
-		{"PUT      ", "/test2/path/to/document", "5"},
-		{"DELETE   ", "/test2/:id/to/document", "6"},
+			ParseRoute("GET      ", "/test2/*               ", simpleHandler("4")),
+			ParseRoute("PUT      ", "/test2/path/to/document", simpleHandler("5")),
+			ParseRoute("DELETE   ", "/test2/:id/to/document ", simpleHandler("6")),
 
-		{"GET      ", "/:var1/:var2/test3/path/to/document", "7"},
-		{"PUT      ", "/:var1/:var2/test3/path/to/document", "8"},
-		{"GET      ", "/:var1/another/path/to/document", "9"},
+			ParseRoute("GET      ", "/:var1/:var2/test3/path/to/document", simpleHandler("7")),
+			ParseRoute("PUT      ", "/:var1/:var2/test3/path/to/document", simpleHandler("8")),
+			ParseRoute("GET      ", "/:var1/another/path/to/document    ", simpleHandler("9")),
 
-		{"GET      ", "/test4", "10"},
-		{"GET      ", "/test4/", "11"},
-		{"GET      ", "/test4/*", "12"},
+			ParseRoute("GET      ", "/test4  ", simpleHandler("10")),
+			ParseRoute("GET      ", "/test4/ ", simpleHandler("11")),
+			ParseRoute("GET      ", "/test4/*", simpleHandler("12")),
 
-		{"GET      ", "/test5/static/child/:variable/grandchild", "13"},
-		{"GET      ", "/test5/:variable/child/static/grandchild", "14"},
-		{"GET      ", "/test5/:variable/child/*", "15"},
+			ParseRoute("GET      ", "/test5/static/child/:variable/grandchild", simpleHandler("13")),
+			ParseRoute("GET      ", "/test5/:variable/child/static/grandchild", simpleHandler("14")),
+			ParseRoute("GET      ", "/test5/:variable/child/*                ", simpleHandler("15")),
 
-		{"GET      ", "/test5/:variable-1/:variable-2/:variable-3/static", "16"},
-		{"GET      ", "/test5/:variable-1/:variable-2/static/child", "17"},
-	} {
-		parsed := ParseRoutes(registration.AllowedMethods, registration.Path, simpleHandler(registration.Body))
-		routes = append(routes, parsed...)
-	}
-	router := RequireNew(Options.Routes(routes...))
+			ParseRoute("GET      ", "/test5/:variable-1/:variable-2/:variable-3/static", simpleHandler("16")),
+			ParseRoute("GET      ", "/test5/:variable-1/:variable-2/static/child      ", simpleHandler("17")),
+		),
+	)
 
 	assertRoute(t, router, "GET    ", "/", 404, "Not Found\n")
 
-	assertRoute(t, router, "GET    ", "/test1/path/to/document", 200, "1")
+	assertRoute(t, router, "GET    ", "/test1/path/to/document ", 200, "1")
 	assertRoute(t, router, "GET    ", "/test1/path/to/document/", 404, "Not Found\n")
-	assertRoute(t, router, "GET    ", "/test1/path/to/doc", 404, "Not Found\n")
-	assertRoute(t, router, "GET    ", "/test1/path/to/", 404, "Not Found\n")
-	assertRoute(t, router, "PUT    ", "/test1/path/to/document", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "POST   ", "/test1/path/to/document", 200, "2")
-	assertRoute(t, router, "OPTIONS", "/test1/path/to/document", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "DELETE ", "/test1/path/to/document", 200, "3")
+	assertRoute(t, router, "GET    ", "/test1/path/to/doc      ", 404, "Not Found\n")
+	assertRoute(t, router, "GET    ", "/test1/path/to/         ", 404, "Not Found\n")
+	assertRoute(t, router, "PUT    ", "/test1/path/to/document ", 405, "Method Not Allowed\n")
+	assertRoute(t, router, "POST   ", "/test1/path/to/document ", 200, "2")
+	assertRoute(t, router, "OPTIONS", "/test1/path/to/document ", 405, "Method Not Allowed\n")
+	assertRoute(t, router, "DELETE ", "/test1/path/to/document ", 200, "3")
 
-	assertRoute(t, router, "GET    ", "/test2/path/to/document", 200, "4")
-	assertRoute(t, router, "PUT    ", "/test2/path/to/document", 200, "5")
-	assertRoute(t, router, "DELETE ", "/test2/path/to/document", 200, "6")
-	assertRoute(t, router, "PATCH ", "/test2/path/to/document", 405, "Method Not Allowed\n")
+	assertRoute(t, router, "GET    ", "/test2/path/to/document               ", 200, "4")
+	assertRoute(t, router, "PUT    ", "/test2/path/to/document               ", 200, "5")
+	assertRoute(t, router, "DELETE ", "/test2/path/to/document               ", 200, "6")
+	assertRoute(t, router, "PATCH  ", "/test2/path/to/document               ", 405, "Method Not Allowed\n")
 	assertRoute(t, router, "DELETE ", "/test2/path/to/document/does-not-exist", 405, "Method Not Allowed\n") // greedy GET /test2/*
 
 	assertRoute(t, router, "GET    ", "/variable1/variable1/test3/path/to/document", 200, "7")
 
-	assertRoute(t, router, "GET    ", "/test4", 200, "10")
-	assertRoute(t, router, "HEAD   ", "/test4", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "GET    ", "/test4/", 200, "11")
+	assertRoute(t, router, "GET    ", "/test4         ", 200, "10")
+	assertRoute(t, router, "HEAD   ", "/test4         ", 405, "Method Not Allowed\n")
+	assertRoute(t, router, "GET    ", "/test4/        ", 200, "11")
 	assertRoute(t, router, "GET    ", "/test4/wildcard", 200, "12")
 	assertRoute(t, router, "DELETE ", "/test4/wildcard", 405, "Method Not Allowed\n")
 
-	assertRoute(t, router, "GET    ", "/test5/static/child/variable-name-here/grandchild", 200, "13")
+	assertRoute(t, router, "GET    ", "/test5/static/child/variable-name-here/grandchild               ", 200, "13")
 	assertRoute(t, router, "GET    ", "/test5/static/child/variable-name-here/grandchild/does-not-exist", 200, "15") // greedy wildcard
-	assertRoute(t, router, "GET    ", "/test5/variable-name-here/child/static/grandchild", 200, "14")
-	assertRoute(t, router, "GET    ", "/test5/variable-name-here/child/wildcard", 200, "15")
+	assertRoute(t, router, "GET    ", "/test5/variable-name-here/child/static/grandchild               ", 200, "14")
+	assertRoute(t, router, "GET    ", "/test5/variable-name-here/child/wildcard                        ", 200, "15")
 
 	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 200, "16")
 	assertRoute(t, router, "DELETE ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/static/child", 200, "17")
+	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/static/child          ", 200, "17")
 }
 func assertRoute(t *testing.T, router http.Handler, method, path string, expectedStatus int, expectedBody string) {
 	t.Helper()
 
-	requestPath := path + "?query=value#hash"
-	request, _ := http.NewRequest(strings.TrimSpace(method), requestPath, nil)
-	request.RequestURI = requestPath
-
+	request := httptest.NewRequest(strings.TrimSpace(method), strings.TrimSpace(path)+"?query=value#hash", nil)
 	recorder := httptest.NewRecorder()
 
 	router.ServeHTTP(recorder, request)
@@ -210,7 +204,7 @@ func BenchmarkRouter(b *testing.B) {
 			ParseRoute("GET", "/path", &nopHandler{}),
 		))
 
-	request, _ := http.NewRequest("GET", "/path", nil)
+	request := httptest.NewRequest("GET", "/path", nil)
 
 	b.ReportAllocs()
 	b.ResetTimer()
