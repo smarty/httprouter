@@ -2,11 +2,6 @@ package httprouter
 
 import "net/http"
 
-// Deprecated
-type Resolver interface {
-	Resolve(method, path string) http.Handler
-}
-
 type routeResolver interface {
 	// Resolve returns an instance of http.Handler and with a flag indicating if the route was understood.
 	// If the http.Handler instance is not nil, the route was fully resolved and can be invoked.
