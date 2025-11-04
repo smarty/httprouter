@@ -46,6 +46,6 @@ func (this *customNotFoundHandler) ServeHTTP(http.ResponseWriter, *http.Request)
 func (*routingMonitor) Routed(*http.Request)                                             {}
 func (*routingMonitor) NotFound(*http.Request)                                           {}
 func (*routingMonitor) MethodNotAllowed(*http.Request)                                   {}
-func (*routingMonitor) Recovered(*http.Request, interface{})                             {}
-func panicRecovery(http.ResponseWriter, *http.Request, interface{})                      {}
+func (*routingMonitor) Recovered(*http.Request, any)                                     {}
+func panicRecovery(http.ResponseWriter, *http.Request, any)                              {}
 ```

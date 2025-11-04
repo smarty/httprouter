@@ -8,6 +8,6 @@ func (this statusHandler) ServeHTTP(response http.ResponseWriter, _ *http.Reques
 	http.Error(response, http.StatusText(int(this)), int(this))
 }
 
-func RecoveryHandler(response http.ResponseWriter, _ *http.Request, _ interface{}) {
+func RecoveryHandler(response http.ResponseWriter, _ *http.Request, _ any) {
 	http.Error(response, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }

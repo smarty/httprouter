@@ -49,11 +49,11 @@ func assertParsedRoutes(t *testing.T, methods, paths string, expectedRoutes ...R
 type That struct{ t *testing.T }
 type Assertion struct {
 	*testing.T
-	actual interface{}
+	actual any
 }
 
-func Assert(t *testing.T) *That                       { return &That{t: t} }
-func (this *That) That(actual interface{}) *Assertion { return &Assertion{T: this.t, actual: actual} }
+func Assert(t *testing.T) *That               { return &That{t: t} }
+func (this *That) That(actual any) *Assertion { return &Assertion{T: this.t, actual: actual} }
 
 func (this *Assertion) IsNil() {
 	this.Helper()
@@ -61,7 +61,7 @@ func (this *Assertion) IsNil() {
 		this.Equals(nil)
 	}
 }
-func (this *Assertion) Equals(expected interface{}) {
+func (this *Assertion) Equals(expected any) {
 	this.Helper()
 	if !reflect.DeepEqual(this.actual, expected) {
 		this.Errorf("\nExpected: %#v\nActual:   %#v", expected, this.actual)

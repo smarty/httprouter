@@ -83,7 +83,7 @@ var Options singleton
 
 type nop struct{}
 
-func (*nop) Routed(*http.Request)                 {}
-func (*nop) NotFound(*http.Request)               {}
-func (*nop) MethodNotAllowed(*http.Request)       {}
-func (*nop) Recovered(*http.Request, interface{}) {}
+func (*nop) Routed(*http.Request)           {}
+func (*nop) NotFound(*http.Request)         {}
+func (*nop) MethodNotAllowed(*http.Request) {}
+func (*nop) Recovered(*http.Request, any)   {}

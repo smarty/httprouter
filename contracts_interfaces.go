@@ -10,11 +10,11 @@ type routeResolver interface {
 	Resolve(method, path string) (http.Handler, bool)
 }
 
-type RecoveryFunc func(response http.ResponseWriter, request *http.Request, recovered interface{})
+type RecoveryFunc func(response http.ResponseWriter, request *http.Request, recovered any)
 
 type Monitor interface {
 	Routed(*http.Request)
 	NotFound(*http.Request)
 	MethodNotAllowed(*http.Request)
-	Recovered(*http.Request, interface{})
+	Recovered(*http.Request, any)
 }
