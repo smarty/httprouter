@@ -23,7 +23,7 @@ func main() {
 		httprouter.Options.MethodNotAllowed(&customMethodNotAllowedHandler{}), // optional
 		httprouter.Options.NotFound(&customNotFoundHandler{}),                 // optional
 		httprouter.Options.Recovery(panicRecovery),                            // optional
-		httprouter.Options.Monitor(&routingMonitor{})) // optional
+		httprouter.Options.Monitor(&routingMonitor{}))                         // optional
 
 	if err != nil {
 		panic(err)
