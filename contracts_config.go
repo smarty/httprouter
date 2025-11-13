@@ -2,14 +2,14 @@ package httprouter
 
 import "net/http"
 
-func RequireNew(options ...option) http.Handler {
+func RequireNew(options ...Option) http.Handler {
 	if handler, err := New(options...); err != nil {
 		panic(err)
 	} else {
 		return handler
 	}
 }
-func New(options ...option) (http.Handler, error) {
+func New(options ...Option) (http.Handler, error) {
 	var config configuration
 	Options.apply(options...)(&config)
 
@@ -30,34 +30,34 @@ func New(options ...option) (http.Handler, error) {
 	return newRecoveryRouter(router, config.Recovery, config.Monitor), nil
 }
 
-func (singleton) AddRoute(method, path string, handler http.Handler) option {
+func (singleton) AddRoute(method, path string, handler http.Handler) Option {
 	return func(this *configuration) { this.Routes = append(this.Routes, ParseRoutes(method, path, handler)...) }
 }
-func (singleton) Routes(value ...Route) option {
+func (singleton) Routes(value ...Route) Option {
 	return func(this *configuration) { this.Routes = append(this.Routes, value...) } // can be empty
 }
-func (singleton) MethodNotAllowed(value http.Handler) option {
+func (singleton) MethodNotAllowed(value http.Handler) Option {
 	return func(this *configuration) { this.MethodNotAllowed = value } // must not be nil
 }
-func (singleton) NotFound(value http.Handler) option {
+func (singleton) NotFound(value http.Handler) Option {
 	return func(this *configuration) { this.NotFound = value } // must not be nil
 }
-func (singleton) Recovery(value RecoveryFunc) option {
+func (singleton) Recovery(value RecoveryFunc) Option {
 	return func(this *configuration) { this.Recovery = value } // can be nil which means to not handle a panic
 }
-func (singleton) Monitor(value Monitor) option {
+func (singleton) Monitor(value Monitor) Option {
 	return func(this *configuration) { this.Monitor = value }
 }
 
-func (singleton) apply(options ...option) option {
+func (singleton) apply(options ...Option) Option {
 	return func(this *configuration) {
 		for _, item := range Options.defaults(options...) {
 			item(this)
 		}
 	}
 }
-func (singleton) defaults(options ...option) []option {
-	return append([]option{
+func (singleton) defaults(options ...Option) []Option {
+	return append([]Option{
 		Options.NotFound(statusHandler(http.StatusNotFound)),
 		Options.MethodNotAllowed(statusHandler(http.StatusMethodNotAllowed)),
 		Options.Recovery(nil), // by default, don't handle a panic
@@ -74,7 +74,7 @@ type configuration struct {
 	Recovery         RecoveryFunc
 	Monitor          Monitor
 }
-type option func(*configuration)
+type Option func(*configuration)
 type singleton struct{}
 
 var Options singleton
