@@ -11,7 +11,7 @@ func RequireNew(options ...Option) http.Handler {
 }
 func New(options ...Option) (http.Handler, error) {
 	var config configuration
-	Options.apply(options...)(&config)
+	Options.With(Options.defaults(options)...)(&config)
 
 	treeRoot := &treeNode{}
 	for _, route := range config.Routes {
@@ -30,6 +30,15 @@ func New(options ...Option) (http.Handler, error) {
 	return newRecoveryRouter(router, config.Recovery, config.Monitor), nil
 }
 
+func (singleton) With(options ...Option) Option {
+	return func(this *configuration) {
+		for _, option := range options {
+			if option != nil {
+				option(this)
+			}
+		}
+	}
+}
 func (singleton) AddRoute(method, path string, handler http.Handler) Option {
 	return func(this *configuration) { this.Routes = append(this.Routes, ParseRoutes(method, path, handler)...) }
 }
@@ -49,14 +58,7 @@ func (singleton) Monitor(value Monitor) Option {
 	return func(this *configuration) { this.Monitor = value }
 }
 
-func (singleton) apply(options ...Option) Option {
-	return func(this *configuration) {
-		for _, item := range Options.defaults(options...) {
-			item(this)
-		}
-	}
-}
-func (singleton) defaults(options ...Option) []Option {
+func (singleton) defaults(options []Option) []Option {
 	return append([]Option{
 		Options.NotFound(statusHandler(http.StatusNotFound)),
 		Options.MethodNotAllowed(statusHandler(http.StatusMethodNotAllowed)),
