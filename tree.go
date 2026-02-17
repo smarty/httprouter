@@ -148,7 +148,7 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, bool) 
 	return nil, staticResourceExists || variableResourceExists
 }
 func parsePathFragment(value string) string {
-	if index := strings.Index(value, "/"); index == -1 {
+	if index := strings.IndexByte(value, '/'); index == -1 {
 		return value
 	} else {
 		return value[0:index]
