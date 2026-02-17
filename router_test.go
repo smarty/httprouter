@@ -149,6 +149,20 @@ func assertRouteAlreadyExists(t *testing.T, method string) {
 		Assert(t).That(err2).Equals(ErrRouteExists)
 	})
 }
+func TestRouteAlreadyExists_NoPartialRegistration(t *testing.T) {
+	tree := &treeNode{}
+	handler := simpleHandler("original")
+
+	_ = tree.Add(Route{AllowedMethods: MethodPost, Path: "/stuff", Handler: handler})
+	err := tree.Add(Route{AllowedMethods: MethodGet | MethodPost, Path: "/stuff", Handler: handler})
+
+	Assert(t).That(err).Equals(ErrRouteExists)
+
+	resolved, _ := tree.Resolve("GET", "/stuff")
+	if resolved != nil {
+		t.Error("expected GET handler to be nil, but it was registered")
+	}
+}
 func TestMalformedRouteRegistration(t *testing.T) {
 	tree := &treeNode{}
 	_, err1 := addRouteWithError(tree, "GET", "//stuff")

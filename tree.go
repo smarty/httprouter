@@ -175,57 +175,44 @@ type methodHandlers struct {
 }
 
 func (this *methodHandlers) Add(allowed Method, handler http.Handler) error {
-	if allowed&MethodGet == MethodGet && this.Get != nil {
+	if allowed&MethodGet == MethodGet && this.Get != nil ||
+		allowed&MethodHead == MethodHead && this.Head != nil ||
+		allowed&MethodPost == MethodPost && this.Post != nil ||
+		allowed&MethodPut == MethodPut && this.Put != nil ||
+		allowed&MethodDelete == MethodDelete && this.Delete != nil ||
+		allowed&MethodConnect == MethodConnect && this.Connect != nil ||
+		allowed&MethodOptions == MethodOptions && this.Options != nil ||
+		allowed&MethodTrace == MethodTrace && this.Trace != nil ||
+		allowed&MethodPatch == MethodPatch && this.Patch != nil {
 		return ErrRouteExists
-	} else if allowed&MethodGet == MethodGet {
+	}
+
+	// allow handler to be registered multiple times
+	if allowed&MethodGet == MethodGet {
 		this.Get = handler
 	}
-
-	if allowed&MethodHead == MethodHead && this.Head != nil {
-		return ErrRouteExists
-	} else if allowed&MethodHead == MethodHead {
+	if allowed&MethodHead == MethodHead {
 		this.Head = handler
 	}
-
-	if allowed&MethodPost == MethodPost && this.Post != nil {
-		return ErrRouteExists
-	} else if allowed&MethodPost == MethodPost {
+	if allowed&MethodPost == MethodPost {
 		this.Post = handler
 	}
-
-	if allowed&MethodPut == MethodPut && this.Put != nil {
-		return ErrRouteExists
-	} else if allowed&MethodPut == MethodPut {
+	if allowed&MethodPut == MethodPut {
 		this.Put = handler
 	}
-
-	if allowed&MethodDelete == MethodDelete && this.Delete != nil {
-		return ErrRouteExists
-	} else if allowed&MethodDelete == MethodDelete {
+	if allowed&MethodDelete == MethodDelete {
 		this.Delete = handler
 	}
-
-	if allowed&MethodConnect == MethodConnect && this.Connect != nil {
-		return ErrRouteExists
-	} else if allowed&MethodConnect == MethodConnect {
+	if allowed&MethodConnect == MethodConnect {
 		this.Connect = handler
 	}
-
-	if allowed&MethodOptions == MethodOptions && this.Options != nil {
-		return ErrRouteExists
-	} else if allowed&MethodOptions == MethodOptions {
+	if allowed&MethodOptions == MethodOptions {
 		this.Options = handler
 	}
-
-	if allowed&MethodTrace == MethodTrace && this.Trace != nil {
-		return ErrRouteExists
-	} else if allowed&MethodTrace == MethodTrace {
+	if allowed&MethodTrace == MethodTrace {
 		this.Trace = handler
 	}
-
-	if allowed&MethodPatch == MethodPatch && this.Patch != nil {
-		return ErrRouteExists
-	} else if allowed&MethodPatch == MethodPatch {
+	if allowed&MethodPatch == MethodPatch {
 		this.Patch = handler
 	}
 
