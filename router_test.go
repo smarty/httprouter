@@ -163,6 +163,15 @@ func TestRouteAlreadyExists_NoPartialRegistration(t *testing.T) {
 		t.Error("expected GET handler to be nil, but it was registered")
 	}
 }
+func TestNonASCIICharactersRejected(t *testing.T) {
+	tree := &treeNode{}
+	_, err1 := addRouteWithError(tree, "GET", "/café")
+	_, err2 := addRouteWithError(tree, "GET", "/日本語")
+	_, err3 := addRouteWithError(tree, "GET", "/path/über")
+	Assert(t).That(err1).Equals(ErrInvalidCharacters)
+	Assert(t).That(err2).Equals(ErrInvalidCharacters)
+	Assert(t).That(err3).Equals(ErrInvalidCharacters)
+}
 func TestMalformedRouteRegistration(t *testing.T) {
 	tree := &treeNode{}
 	_, err1 := addRouteWithError(tree, "GET", "//stuff")
