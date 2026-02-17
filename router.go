@@ -33,7 +33,7 @@ func (this *defaultRouter) resolve(request *http.Request) http.Handler {
 		this.monitor.MethodNotAllowed(request)
 		return this.methodNotAllowed
 	} else {
-		this.monitor.MethodNotAllowed(request)
+		this.monitor.NotFound(request)
 		return this.notFound
 	}
 }
