@@ -15,6 +15,7 @@ func TestRouting(t *testing.T) {
 			ParseRoute("GET|HEAD ", "/test1/path/to/document", simpleHandler("1")),
 			ParseRoute("POST     ", "/test1/path/to/document", simpleHandler("2")),
 			ParseRoute("DELETE   ", "/test1/path/to/document", simpleHandler("3")),
+			ParseRoute("PATCH    ", "/test1/path/to/document", simpleHandler("18")),
 
 			ParseRoute("GET      ", "/test2/*               ", simpleHandler("4")),
 			ParseRoute("PUT      ", "/test2/path/to/document", simpleHandler("5")),
@@ -47,6 +48,8 @@ func TestRouting(t *testing.T) {
 	assertRoute(t, router, "POST   ", "/test1/path/to/document ", 200, "2")
 	assertRoute(t, router, "OPTIONS", "/test1/path/to/document ", 405, "Method Not Allowed\n")
 	assertRoute(t, router, "DELETE ", "/test1/path/to/document ", 200, "3")
+	assertRoute(t, router, "PATCH  ", "/test1/path/to/document ", 200, "18")
+	assertRoute(t, router, "BOGUS  ", "/test1/path/to/document ", 405, "Method Not Allowed\n")
 
 	assertRoute(t, router, "GET    ", "/test2/path/to/document               ", 200, "4")
 	assertRoute(t, router, "PUT    ", "/test2/path/to/document               ", 200, "5")
