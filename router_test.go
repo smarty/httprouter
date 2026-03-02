@@ -38,43 +38,43 @@ func TestRouting(t *testing.T) {
 		),
 	)
 
-	assertRoute(t, router, "GET    ", "/", 404, "Not Found\n")
+	assertRoute(t, router, "GET    ", "/", 404, "Not Found\n", "")
 
-	assertRoute(t, router, "GET    ", "/test1/path/to/document ", 200, "1")
-	assertRoute(t, router, "GET    ", "/test1/path/to/document/", 404, "Not Found\n")
-	assertRoute(t, router, "GET    ", "/test1/path/to/doc      ", 404, "Not Found\n")
-	assertRoute(t, router, "GET    ", "/test1/path/to/         ", 404, "Not Found\n")
-	assertRoute(t, router, "PUT    ", "/test1/path/to/document ", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "POST   ", "/test1/path/to/document ", 200, "2")
-	assertRoute(t, router, "OPTIONS", "/test1/path/to/document ", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "DELETE ", "/test1/path/to/document ", 200, "3")
-	assertRoute(t, router, "PATCH  ", "/test1/path/to/document ", 200, "18")
-	assertRoute(t, router, "BOGUS  ", "/test1/path/to/document ", 405, "Method Not Allowed\n")
+	assertRoute(t, router, "GET    ", "/test1/path/to/document ", 200, "1", "")
+	assertRoute(t, router, "GET    ", "/test1/path/to/document/", 404, "Not Found\n", "")
+	assertRoute(t, router, "GET    ", "/test1/path/to/doc      ", 404, "Not Found\n", "")
+	assertRoute(t, router, "GET    ", "/test1/path/to/         ", 404, "Not Found\n", "")
+	assertRoute(t, router, "PUT    ", "/test1/path/to/document ", 405, "Method Not Allowed\n", "GET, HEAD, POST, DELETE, PATCH")
+	assertRoute(t, router, "POST   ", "/test1/path/to/document ", 200, "2", "")
+	assertRoute(t, router, "OPTIONS", "/test1/path/to/document ", 405, "Method Not Allowed\n", "GET, HEAD, POST, DELETE, PATCH")
+	assertRoute(t, router, "DELETE ", "/test1/path/to/document ", 200, "3", "")
+	assertRoute(t, router, "PATCH  ", "/test1/path/to/document ", 200, "18", "")
+	assertRoute(t, router, "BOGUS  ", "/test1/path/to/document ", 405, "Method Not Allowed\n", "GET, HEAD, POST, DELETE, PATCH")
 
-	assertRoute(t, router, "GET    ", "/test2/path/to/document               ", 200, "4")
-	assertRoute(t, router, "PUT    ", "/test2/path/to/document               ", 200, "5")
-	assertRoute(t, router, "DELETE ", "/test2/path/to/document               ", 200, "6")
-	assertRoute(t, router, "PATCH  ", "/test2/path/to/document               ", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "DELETE ", "/test2/path/to/document/does-not-exist", 405, "Method Not Allowed\n") // greedy GET /test2/*
+	assertRoute(t, router, "GET    ", "/test2/path/to/document               ", 200, "4", "")
+	assertRoute(t, router, "PUT    ", "/test2/path/to/document               ", 200, "5", "")
+	assertRoute(t, router, "DELETE ", "/test2/path/to/document               ", 200, "6", "")
+	assertRoute(t, router, "PATCH  ", "/test2/path/to/document               ", 405, "Method Not Allowed\n", "GET, PUT, DELETE")
+	assertRoute(t, router, "DELETE ", "/test2/path/to/document/does-not-exist", 405, "Method Not Allowed\n", "GET") // greedy GET /test2/*
 
-	assertRoute(t, router, "GET    ", "/variable1/variable1/test3/path/to/document", 200, "7")
+	assertRoute(t, router, "GET    ", "/variable1/variable1/test3/path/to/document", 200, "7", "")
 
-	assertRoute(t, router, "CONNECT", "/test4         ", 200, "10")
-	assertRoute(t, router, "HEAD   ", "/test4         ", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "CONNECT", "/test4/        ", 200, "11")
-	assertRoute(t, router, "CONNECT", "/test4/wildcard", 200, "12")
-	assertRoute(t, router, "DELETE ", "/test4/wildcard", 405, "Method Not Allowed\n")
+	assertRoute(t, router, "CONNECT", "/test4         ", 200, "10", "")
+	assertRoute(t, router, "HEAD   ", "/test4         ", 405, "Method Not Allowed\n", "CONNECT")
+	assertRoute(t, router, "CONNECT", "/test4/        ", 200, "11", "")
+	assertRoute(t, router, "CONNECT", "/test4/wildcard", 200, "12", "")
+	assertRoute(t, router, "DELETE ", "/test4/wildcard", 405, "Method Not Allowed\n", "CONNECT")
 
-	assertRoute(t, router, "TRACE  ", "/test5/static/child/variable-name-here/grandchild               ", 200, "13")
-	assertRoute(t, router, "TRACE  ", "/test5/static/child/variable-name-here/grandchild/does-not-exist", 200, "15") // greedy wildcard
-	assertRoute(t, router, "TRACE  ", "/test5/variable-name-here/child/static/grandchild               ", 200, "14")
-	assertRoute(t, router, "TRACE  ", "/test5/variable-name-here/child/wildcard                        ", 200, "15")
+	assertRoute(t, router, "TRACE  ", "/test5/static/child/variable-name-here/grandchild               ", 200, "13", "")
+	assertRoute(t, router, "TRACE  ", "/test5/static/child/variable-name-here/grandchild/does-not-exist", 200, "15", "") // greedy wildcard
+	assertRoute(t, router, "TRACE  ", "/test5/variable-name-here/child/static/grandchild               ", 200, "14", "")
+	assertRoute(t, router, "TRACE  ", "/test5/variable-name-here/child/wildcard                        ", 200, "15", "")
 
-	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 200, "16")
-	assertRoute(t, router, "DELETE ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 405, "Method Not Allowed\n")
-	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/static/child          ", 200, "17")
+	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 200, "16", "")
+	assertRoute(t, router, "DELETE ", "/test5/variable-1-here/variable-2-here/variable-3-here/static", 405, "Method Not Allowed\n", "GET")
+	assertRoute(t, router, "GET    ", "/test5/variable-1-here/variable-2-here/static/child          ", 200, "17", "")
 }
-func assertRoute(t *testing.T, router http.Handler, method, path string, expectedStatus int, expectedBody string) {
+func assertRoute(t *testing.T, router http.Handler, method, path string, expectedStatus int, expectedBody, expectedAllow string) {
 	t.Helper()
 	t.Run(fmt.Sprintf("%s:%s:%d", method, path, expectedStatus), func(t *testing.T) {
 		t.Helper()
@@ -91,6 +91,11 @@ func assertRoute(t *testing.T, router http.Handler, method, path string, expecte
 			if actualBody != expectedBody {
 				t.Errorf("expected body [%s], actual body: [%s] for test [%s %s]", expectedBody, actualBody, method, path)
 			}
+		}
+
+		actualAllow := recorder.Header().Get("Allow")
+		if actualAllow != expectedAllow {
+			t.Errorf("expected Allow [%s], actual Allow: [%s] for test [%s %s]", expectedAllow, actualAllow, method, path)
 		}
 	})
 }
