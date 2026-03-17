@@ -103,13 +103,12 @@ func hasOnlyAllowedCharacters(input string) bool {
 	return true
 }
 
-func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, bool) {
+func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method) {
 	if len(incomingPath) == 0 {
 		if this.handlers == nil {
-			return nil, false
-		} else {
-			return this.handlers.Resolve(method), true
+			return nil, 0
 		}
+		return this.handlers.Resolve(method), this.handlers.allowed
 	}
 
 	if incomingPath[0] == '/' {
@@ -117,7 +116,7 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, bool) 
 	}
 
 	var handler http.Handler
-	var staticResourceExists, variableResourceExists bool
+	var staticAllowed, variableAllowed Method
 
 	var pathFragment = parsePathFragment(incomingPath)
 	for _, staticChild := range this.static {
@@ -125,27 +124,27 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, bool) 
 			continue
 		}
 
-		// the path fragment DOES match...
 		remainingPath := incomingPath[len(pathFragment):]
-		if handler, staticResourceExists = staticChild.Resolve(method, remainingPath); handler != nil {
-			return handler, staticResourceExists
+		if handler, staticAllowed = staticChild.Resolve(method, remainingPath); handler != nil {
+			return handler, MethodNone
 		}
 
-		break // don't bother checking any more of siblings of the static child, they don't match
+		break
 	}
 
 	if this.variable != nil {
 		remainingPath := incomingPath[len(pathFragment):]
-		if handler, variableResourceExists = this.variable.Resolve(method, remainingPath); handler != nil {
-			return handler, variableResourceExists
+		if handler, variableAllowed = this.variable.Resolve(method, remainingPath); handler != nil {
+			return handler, MethodNone
 		}
 	}
 
 	if this.wildcard != nil {
-		return this.wildcard.Resolve(method, "")
+		wildcardHandler, wildcardAllowed := this.wildcard.Resolve(method, "")
+		return wildcardHandler, staticAllowed | variableAllowed | wildcardAllowed
 	}
 
-	return nil, staticResourceExists || variableResourceExists
+	return nil, staticAllowed | variableAllowed
 }
 func parsePathFragment(value string) string {
 	if index := strings.IndexByte(value, '/'); index == -1 {
@@ -176,6 +175,7 @@ var allowedCharacters = map[rune]struct{}{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type methodHandlers struct {
+	allowed Method
 	Get     http.Handler
 	Head    http.Handler
 	Post    http.Handler
@@ -229,6 +229,7 @@ func (this *methodHandlers) Add(allowed Method, handler http.Handler) error {
 		this.Patch = handler
 	}
 
+	this.allowed |= allowed
 	return nil
 }
 func (this *methodHandlers) Resolve(method string) http.Handler {

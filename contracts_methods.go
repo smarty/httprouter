@@ -42,6 +42,19 @@ func (this Method) String() string {
 	return result
 }
 func (this Method) GoString() string { return this.String() }
+func (this Method) HeaderValue() string {
+	var result strings.Builder
+	for _, key := range orderedMethods {
+		if key&this != key {
+			continue
+		}
+		if result.Len() > 0 {
+			result.WriteString(", ")
+		}
+		result.WriteString(methodValues[key])
+	}
+	return result.String()
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

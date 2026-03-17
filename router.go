@@ -16,9 +16,6 @@ func newRouter(resolver routeResolver, notFound, methodNotAllowed http.Handler, 
 	return &defaultRouter{resolver: resolver, notFound: notFound, methodNotAllowed: methodNotAllowed, monitor: monitor}
 }
 func (this *defaultRouter) ServeHTTP(response http.ResponseWriter, request *http.Request) {
-	this.resolve(request).ServeHTTP(response, request)
-}
-func (this *defaultRouter) resolve(request *http.Request) http.Handler {
 	rawPath := request.RequestURI
 	if len(rawPath) == 0 {
 		rawPath = request.URL.Path
@@ -26,15 +23,17 @@ func (this *defaultRouter) resolve(request *http.Request) http.Handler {
 		rawPath = rawPath[0:index]
 	}
 
-	if handler, resolved := this.resolver.Resolve(request.Method, rawPath); handler != nil {
+	handler, allowed := this.resolver.Resolve(request.Method, rawPath)
+	if handler != nil {
 		this.monitor.Routed(request)
-		return handler
-	} else if resolved {
+		handler.ServeHTTP(response, request)
+	} else if allowed > 0 {
 		this.monitor.MethodNotAllowed(request)
-		return this.methodNotAllowed
+		response.Header().Set("Allow", allowed.HeaderValue())
+		this.methodNotAllowed.ServeHTTP(response, request)
 	} else {
 		this.monitor.NotFound(request)
-		return this.notFound
+		this.notFound.ServeHTTP(response, request)
 	}
 }
 
