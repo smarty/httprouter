@@ -33,7 +33,7 @@ func (this *treeNode) Add(route Route) error {
 	}
 
 	var pathFragmentForChildNode string
-	slashIndex := strings.Index(route.Path, "/")
+	slashIndex := strings.IndexByte(route.Path, '/')
 	if slashIndex == 0 {
 		return ErrMalformedPath // first character is a slash, that means the URL provided looks something like this: /path/to//document (note the double slash)
 	} else if slashIndex == -1 {
