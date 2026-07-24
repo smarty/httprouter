@@ -23,9 +23,8 @@ func New(options ...Option) (http.Handler, error) {
 	// nodes once here. This finalizes the tree, letting Resolve settle a non-branching path in one comparison
 	// instead of one recursive frame per segment.
 	treeRoot.compact()
-	compiled := compileTree(treeRoot)
 
-	router := newRouter(compiled, config.NotFound, config.MethodNotAllowed, config.Monitor)
+	router := newRouter(treeRoot, config.NotFound, config.MethodNotAllowed, config.Monitor)
 	if config.Recovery == nil {
 		return router, nil
 	}
