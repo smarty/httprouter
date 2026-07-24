@@ -100,6 +100,32 @@ func assertRoute(t *testing.T, router http.Handler, method, path string, expecte
 	})
 }
 
+// TestWideStaticNode exercises nodes with more than a handful of static children, which cross the threshold
+// where the router switches from a linear scan to the map-backed index. Registers 12 siblings at the root and
+// 12 more under a nested node, then verifies every route resolves to its own handler and that near-misses
+// (unregistered segment, prefix of a segment, wrong method) behave correctly.
+func TestWideStaticNode(t *testing.T) {
+	segments := []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
+		"golf", "hotel", "india", "juliet", "kilo", "lima"} // 12 > threshold, forces the map branch
+
+	options := make([]Route, 0, len(segments)*2)
+	for _, segment := range segments {
+		options = append(options, ParseRoute("GET", "/"+segment, simpleHandler(segment)))
+		options = append(options, ParseRoute("GET", "/nested/"+segment, simpleHandler("nested-"+segment)))
+	}
+	router := RequireNew(Options.Routes(options...))
+
+	for _, segment := range segments {
+		assertRoute(t, router, "GET", "/"+segment, 200, segment, "")
+		assertRoute(t, router, "GET", "/nested/"+segment, 200, "nested-"+segment, "")
+	}
+
+	assertRoute(t, router, "GET", "/mike", 404, "Not Found\n", "")            // unregistered wide sibling
+	assertRoute(t, router, "GET", "/alph", 404, "Not Found\n", "")            // prefix of a registered segment
+	assertRoute(t, router, "GET", "/alphabet", 404, "Not Found\n", "")        // registered segment is a prefix
+	assertRoute(t, router, "POST", "/alpha", 405, "Method Not Allowed\n", "GET")
+}
+
 func TestFallbackToURL(t *testing.T) {
 	router := RequireNew(Options.AddRoute("GET", "/", simpleHandler(t.Name())))
 	request := httptest.NewRequest("GET", "/", nil)

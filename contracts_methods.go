@@ -43,6 +43,12 @@ func (this Method) String() string {
 }
 func (this Method) GoString() string { return this.String() }
 func (this Method) HeaderValue() string {
+	if int(this) < len(allowHeaderValues) {
+		return allowHeaderValues[this]
+	}
+	return this.buildHeaderValue()
+}
+func (this Method) buildHeaderValue() string {
 	var result strings.Builder
 	for _, key := range orderedMethods {
 		if key&this != key {
@@ -55,6 +61,15 @@ func (this Method) HeaderValue() string {
 	}
 	return result.String()
 }
+
+// allowHeaderValues caches every possible Allow-header string keyed by the Method bitmask. The 9 method bits
+// occupy 1<<1..1<<9, so every reachable union is < 1<<10; precomputing at init keeps the 405 path allocation-free.
+var allowHeaderValues = func() (cache [1 << 10]string) {
+	for combination := range cache {
+		cache[combination] = Method(combination).buildHeaderValue()
+	}
+	return cache
+}()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

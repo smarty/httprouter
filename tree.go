@@ -144,22 +144,37 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method
 	var handler http.Handler
 	var staticAllowed, variableAllowed Method
 
-	var pathFragment = parsePathFragment(incomingPath)
-	remainingPath := incomingPath[len(pathFragment):]
-
-	if this.staticIndex != nil {
+	if len(this.static) >= staticIndexThreshold {
+		// Wide node: the map is keyed by the segment string, so compute the fragment for the probe.
+		var pathFragment string
+		if slash := strings.IndexByte(incomingPath, '/'); slash < 0 {
+			pathFragment = incomingPath
+		} else {
+			pathFragment = incomingPath[:slash]
+		}
 		if staticChild, found := this.staticIndex[pathFragment]; found {
-			if handler, staticAllowed = staticChild.Resolve(method, remainingPath); handler != nil {
+			if handler, staticAllowed = staticChild.Resolve(method, incomingPath[len(pathFragment):]); handler != nil {
 				return handler, MethodNone
 			}
 		}
 	} else {
+		// Narrow node: match each child fragment as a segment prefix — no IndexByte scan needed.
 		for _, staticChild := range this.static {
-			if pathFragment != staticChild.pathFragment {
+			fragmentLength := len(staticChild.pathFragment)
+			if len(incomingPath) < fragmentLength {
 				continue
 			}
+			if fragmentLength > 0 && incomingPath[0] != staticChild.pathFragment[0] {
+				continue // cheap first-byte reject before the full compare (empty fragment: trailing-slash child)
+			}
+			if incomingPath[:fragmentLength] != staticChild.pathFragment {
+				continue
+			}
+			if fragmentLength != len(incomingPath) && incomingPath[fragmentLength] != '/' {
+				continue // segment boundary mismatch (e.g. child "stuff" vs segment "stuffx")
+			}
 
-			if handler, staticAllowed = staticChild.Resolve(method, remainingPath); handler != nil {
+			if handler, staticAllowed = staticChild.Resolve(method, incomingPath[fragmentLength:]); handler != nil {
 				return handler, MethodNone
 			}
 
@@ -168,6 +183,11 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method
 	}
 
 	if this.variable != nil {
+		// A variable consumes exactly one segment, so the boundary is needed here.
+		var remainingPath string
+		if slash := strings.IndexByte(incomingPath, '/'); slash >= 0 {
+			remainingPath = incomingPath[slash:]
+		}
 		if handler, variableAllowed = this.variable.Resolve(method, remainingPath); handler != nil {
 			return handler, MethodNone
 		}
