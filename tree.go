@@ -23,6 +23,9 @@ func (this *treeNode) Add(route Route) error {
 	if route.AllowedMethods == MethodNone {
 		return ErrUnknownMethod
 	}
+	if route.Handler == nil {
+		return ErrNilHandler
+	}
 
 	if len(route.Path) == 0 {
 		if this.handlers == nil {
@@ -290,15 +293,7 @@ type methodHandlers struct {
 }
 
 func (this *methodHandlers) Add(allowed Method, handler http.Handler) error {
-	if allowed&MethodGet == MethodGet && this.Get != nil ||
-		allowed&MethodHead == MethodHead && this.Head != nil ||
-		allowed&MethodPost == MethodPost && this.Post != nil ||
-		allowed&MethodPut == MethodPut && this.Put != nil ||
-		allowed&MethodDelete == MethodDelete && this.Delete != nil ||
-		allowed&MethodConnect == MethodConnect && this.Connect != nil ||
-		allowed&MethodOptions == MethodOptions && this.Options != nil ||
-		allowed&MethodTrace == MethodTrace && this.Trace != nil ||
-		allowed&MethodPatch == MethodPatch && this.Patch != nil {
+	if this.allowed&allowed&^MethodNone != 0 {
 		return ErrRouteExists
 	}
 

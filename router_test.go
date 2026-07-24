@@ -289,6 +289,23 @@ func TestRouteAlreadyExists_NoPartialRegistration(t *testing.T) {
 		t.Error("expected GET handler to be nil, but it was registered")
 	}
 }
+func TestNilRouteHandler(t *testing.T) {
+	tree := &treeNode{}
+	route := Route{AllowedMethods: MethodGet, Path: "/stuff"}
+
+	Assert(t).That(tree.Add(route)).Equals(ErrNilHandler)
+
+	route.Handler = simpleHandler(t.Name())
+	Assert(t).That(tree.Add(route)).IsNil()
+
+	handler, _ := tree.Resolve("GET", "/stuff")
+	if handler == nil {
+		t.Error("expected valid registration after rejected nil handler")
+	}
+
+	_, err := New(Options.AddRoute("GET", "/stuff", nil))
+	Assert(t).That(err).Equals(ErrNilHandler)
+}
 func TestNonASCIICharactersRejected(t *testing.T) {
 	tree := &treeNode{}
 	_, err1 := addRouteWithError(tree, "GET", "/café")
