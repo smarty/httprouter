@@ -181,6 +181,22 @@ func TestCompactionWideMultiSegment(t *testing.T) {
 	assertRoute(t, router, "GET", "/mike/detail", 404, "Not Found\n", "")   // unregistered first segment
 }
 
+func TestVariableRequiresNonEmptySegment(t *testing.T) {
+	router := RequireNew(
+		Options.Routes(
+			ParseRoute("GET", "/users/:id", simpleHandler("user")),
+			ParseRoute("GET", "/users/:id/profile", simpleHandler("profile")),
+		),
+	)
+
+	assertRoute(t, router, "GET", "/users/42", 200, "user", "")
+	assertRoute(t, router, "GET", "/users/42/profile", 200, "profile", "")
+	assertRoute(t, router, "GET", "/users/", 404, "Not Found\n", "")
+	assertRoute(t, router, "GET", "/users//", 404, "Not Found\n", "")
+	assertRoute(t, router, "GET", "/users//profile", 404, "Not Found\n", "")
+	assertRoute(t, router, "POST", "/users/", 404, "Not Found\n", "")
+}
+
 // TestCompactionCollapsesNodes asserts the pass actually merges the chain (not merely that routing still works),
 // and that an intermediate handler halts the merge so the node retains both its handler and its deeper child.
 func TestCompactionCollapsesNodes(t *testing.T) {

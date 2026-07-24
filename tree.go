@@ -237,7 +237,7 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method
 		}
 	}
 
-	if this.variable != nil {
+	if this.variable != nil && len(incomingPath) > 0 && incomingPath[0] != '/' {
 		// A variable consumes exactly one segment, so the boundary is needed here.
 		var remainingPath string
 		if slash := strings.IndexByte(incomingPath, '/'); slash >= 0 {

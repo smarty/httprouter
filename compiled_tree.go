@@ -199,7 +199,7 @@ func (this *compiledTree) resolve(node *compiledNode, method, incomingPath strin
 		}
 
 		var variableAllowed Method
-		if node.variable != nil {
+		if node.variable != nil && len(incomingPath) > 0 && incomingPath[0] != '/' {
 			var remainingPath string
 			if slash := strings.IndexByte(incomingPath, '/'); slash >= 0 {
 				remainingPath = incomingPath[slash:]
