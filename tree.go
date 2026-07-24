@@ -8,10 +8,16 @@ import (
 type treeNode struct {
 	pathFragment string
 	static       []*treeNode
+	staticIndex  map[string]*treeNode // populated only once static children exceed staticIndexThreshold; nil for narrow nodes
 	variable     *treeNode
 	wildcard     *treeNode
 	handlers     *methodHandlers
 }
+
+// staticIndexThreshold is the number of static children beyond which a node maintains a map for O(1) lookups
+// instead of a linear scan. Below it, the linear scan over the slice is faster and more cache-friendly than
+// hashing the path fragment, so the map is not built.
+const staticIndexThreshold = 8
 
 func (this *treeNode) Add(route Route) error {
 	if route.AllowedMethods == MethodNone {
@@ -87,7 +93,27 @@ func (this *treeNode) addStatic(route Route, pathFragment string) (err error) {
 	}
 
 	this.static = append(this.static, staticChild)
+	this.indexStatic(staticChild)
 	return nil
+}
+
+// indexStatic maintains the staticIndex map for wide nodes. Once the child count crosses staticIndexThreshold the
+// map is built (one-time) and thereafter kept in sync as new children are appended. This runs during route
+// registration, not on the request hot path.
+func (this *treeNode) indexStatic(staticChild *treeNode) {
+	if this.staticIndex != nil {
+		this.staticIndex[staticChild.pathFragment] = staticChild
+		return
+	}
+
+	if len(this.static) < staticIndexThreshold {
+		return
+	}
+
+	this.staticIndex = make(map[string]*treeNode, len(this.static))
+	for _, existingChild := range this.static {
+		this.staticIndex[existingChild.pathFragment] = existingChild
+	}
 }
 func hasOnlyAllowedCharacters(input string) bool {
 	for index, value := range input {
@@ -119,21 +145,29 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method
 	var staticAllowed, variableAllowed Method
 
 	var pathFragment = parsePathFragment(incomingPath)
-	for _, staticChild := range this.static {
-		if pathFragment != staticChild.pathFragment {
-			continue
-		}
+	remainingPath := incomingPath[len(pathFragment):]
 
-		remainingPath := incomingPath[len(pathFragment):]
-		if handler, staticAllowed = staticChild.Resolve(method, remainingPath); handler != nil {
-			return handler, MethodNone
+	if this.staticIndex != nil {
+		if staticChild, found := this.staticIndex[pathFragment]; found {
+			if handler, staticAllowed = staticChild.Resolve(method, remainingPath); handler != nil {
+				return handler, MethodNone
+			}
 		}
+	} else {
+		for _, staticChild := range this.static {
+			if pathFragment != staticChild.pathFragment {
+				continue
+			}
 
-		break
+			if handler, staticAllowed = staticChild.Resolve(method, remainingPath); handler != nil {
+				return handler, MethodNone
+			}
+
+			break
+		}
 	}
 
 	if this.variable != nil {
-		remainingPath := incomingPath[len(pathFragment):]
 		if handler, variableAllowed = this.variable.Resolve(method, remainingPath); handler != nil {
 			return handler, MethodNone
 		}

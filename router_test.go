@@ -273,6 +273,53 @@ func BenchmarkRouter(b *testing.B) {
 	}
 }
 
+func BenchmarkTreeWide(b *testing.B) {
+	const childCount = 100
+	tree := &treeNode{}
+	for i := 0; i < childCount; i++ {
+		addRoute(tree, "GET", fmt.Sprintf("/segment%d", i))
+	}
+
+	// Resolve the last-registered child: worst case for a linear scan of the static children.
+	lastChild := fmt.Sprintf("/segment%d", childCount-1)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = tree.Resolve("GET", lastChild)
+	}
+}
+func BenchmarkTreeVariable(b *testing.B) {
+	tree := &treeNode{}
+	addRoute(tree, "GET", "/stuff/:id/details")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, _ = tree.Resolve("GET", "/stuff/42/details")
+	}
+}
+func BenchmarkRouterQuery(b *testing.B) {
+	router := RequireNew(
+		Options.Routes(
+			ParseRoute("GET", "/child1/node/", &nopHandler{}),
+			ParseRoute("GET", "/child2/node", &nopHandler{}),
+			ParseRoute("GET", "/child3/node", &nopHandler{}),
+			ParseRoute("GET", "/path", &nopHandler{}),
+		))
+
+	request := httptest.NewRequest("GET", "/path?query=value&another=thing", nil)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		router.ServeHTTP(nil, request)
+	}
+}
+
 type nopHandler struct{}
 
 func (this *nopHandler) ServeHTTP(http.ResponseWriter, *http.Request) {}
