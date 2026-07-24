@@ -20,7 +20,9 @@ type treeNode struct {
 const staticIndexThreshold = 8
 
 func (this *treeNode) Add(route Route) error {
-	if route.AllowedMethods == MethodNone {
+	if route.AllowedMethods == 0 ||
+		route.AllowedMethods&MethodNone != 0 ||
+		route.AllowedMethods&^supportedMethods != 0 {
 		return ErrUnknownMethod
 	}
 	if route.Handler == nil {

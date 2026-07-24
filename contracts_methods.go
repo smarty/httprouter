@@ -84,6 +84,16 @@ const (
 	MethodOptions
 	MethodTrace
 	MethodPatch
+
+	supportedMethods = MethodGet |
+		MethodHead |
+		MethodPost |
+		MethodPut |
+		MethodDelete |
+		MethodConnect |
+		MethodOptions |
+		MethodTrace |
+		MethodPatch
 )
 
 var (

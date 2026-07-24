@@ -333,6 +333,38 @@ func TestMalformedRouteRegistration(t *testing.T) {
 	Assert(t).That(err7).Equals(ErrUnknownMethod)
 }
 
+func TestUnknownMethodDoesNotPartiallyRegisterRoute(t *testing.T) {
+	tree := &treeNode{}
+	handler := simpleHandler(t.Name())
+
+	err := tree.Add(ParseRoute("GET|BAD-METHOD", "/stuff", handler))
+	Assert(t).That(err).Equals(ErrUnknownMethod)
+
+	err = tree.Add(Route{
+		AllowedMethods: MethodGet | Method(1<<15),
+		Path:           "/manual-mask",
+		Handler:        handler,
+	})
+	Assert(t).That(err).Equals(ErrUnknownMethod)
+
+	err = tree.Add(Route{
+		Path:    "/zero-mask",
+		Handler: handler,
+	})
+	Assert(t).That(err).Equals(ErrUnknownMethod)
+
+	resolved, allowed := tree.Resolve("GET", "/stuff")
+	if resolved != nil || allowed != 0 {
+		t.Error("invalid method mask partially registered a route")
+	}
+
+	_, err = New(Options.AddRoute("GET|BAD-METHOD", "/stuff", handler))
+	Assert(t).That(err).Equals(ErrUnknownMethod)
+
+	_, err = New(Options.AddRoute("GET||POST", "/stuff", handler))
+	Assert(t).That(err).Equals(ErrUnknownMethod)
+}
+
 func addRoute(tree *treeNode, method, path string) fakeHandler {
 	parsedMethod := ParseMethod(method)
 	handler := newFakeHandler(parsedMethod, path)
