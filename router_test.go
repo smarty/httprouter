@@ -120,10 +120,89 @@ func TestWideStaticNode(t *testing.T) {
 		assertRoute(t, router, "GET", "/nested/"+segment, 200, "nested-"+segment, "")
 	}
 
-	assertRoute(t, router, "GET", "/mike", 404, "Not Found\n", "")            // unregistered wide sibling
-	assertRoute(t, router, "GET", "/alph", 404, "Not Found\n", "")            // prefix of a registered segment
-	assertRoute(t, router, "GET", "/alphabet", 404, "Not Found\n", "")        // registered segment is a prefix
+	assertRoute(t, router, "GET", "/mike", 404, "Not Found\n", "")     // unregistered wide sibling
+	assertRoute(t, router, "GET", "/alph", 404, "Not Found\n", "")     // prefix of a registered segment
+	assertRoute(t, router, "GET", "/alphabet", 404, "Not Found\n", "") // registered segment is a prefix
 	assertRoute(t, router, "POST", "/alpha", 405, "Method Not Allowed\n", "GET")
+}
+
+// TestCompaction verifies that the post-registration compaction pass, which merges single-child static chains
+// into multi-segment nodes, preserves routing semantics across every shape it can encounter: a long
+// non-branching path, a shared prefix that branches, a static prefix ending in a variable or wildcard, an
+// intermediate handler that must halt the merge, a trailing-slash leaf, and a wide node whose children are
+// themselves compacted chains.
+func TestCompaction(t *testing.T) {
+	router := RequireNew(Options.Routes(
+		ParseRoute("GET", "/api/v1/services/auth/tokens", simpleHandler("tokens")), // long non-branching
+		ParseRoute("GET", "/shop/catalog/items/list", simpleHandler("list")),       // shared prefix, branches
+		ParseRoute("GET", "/shop/catalog/items/detail", simpleHandler("detail")),   // ...at "items"
+		ParseRoute("GET", "/users/profile/:id", simpleHandler("profile")),          // static prefix, variable leaf
+		ParseRoute("GET", "/static/assets/*", simpleHandler("assets")),             // static prefix, wildcard leaf
+		ParseRoute("GET", "/x/y", simpleHandler("xy")),                             // intermediate handler...
+		ParseRoute("GET", "/x/y/z", simpleHandler("xyz")),                          // ...must not be swallowed
+		ParseRoute("GET", "/trail/", simpleHandler("trail")),                       // trailing-slash leaf
+	))
+
+	assertRoute(t, router, "GET", "/api/v1/services/auth/tokens", 200, "tokens", "")
+	assertRoute(t, router, "GET", "/api/v1/services/auth", 404, "Not Found\n", "") // intermediate, no handler
+	assertRoute(t, router, "GET", "/api/v1/services/auth/tokensX", 404, "Not Found\n", "")
+	assertRoute(t, router, "GET", "/shop/catalog/items/list", 200, "list", "")
+	assertRoute(t, router, "GET", "/shop/catalog/items/detail", 200, "detail", "")
+	assertRoute(t, router, "GET", "/shop/catalog/items", 404, "Not Found\n", "")
+	assertRoute(t, router, "GET", "/users/profile/42", 200, "profile", "")
+	assertRoute(t, router, "GET", "/users/profile", 404, "Not Found\n", "") // variable segment is required
+	assertRoute(t, router, "GET", "/static/assets/css/app.min.css", 200, "assets", "")
+	assertRoute(t, router, "GET", "/x/y", 200, "xy", "")    // handler on the intermediate node
+	assertRoute(t, router, "GET", "/x/y/z", 200, "xyz", "") // deeper handler still reachable
+	assertRoute(t, router, "GET", "/trail/", 200, "trail", "")
+	assertRoute(t, router, "GET", "/trail", 404, "Not Found\n", "")
+	assertRoute(t, router, "POST", "/x/y", 405, "Method Not Allowed\n", "GET")
+}
+
+// TestCompactionWideMultiSegment exercises a wide node (map-backed index) whose children are themselves
+// compacted multi-segment chains — the branch where the first-segment map probe must still confirm the rest of
+// the fused fragment. Registers enough siblings to cross staticIndexThreshold, each a two-segment chain.
+func TestCompactionWideMultiSegment(t *testing.T) {
+	segments := []string{"alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
+		"golf", "hotel", "india", "juliet"} // 10 > threshold, forces the map branch
+
+	options := make([]Route, 0, len(segments))
+	for _, segment := range segments {
+		options = append(options, ParseRoute("GET", "/"+segment+"/detail", simpleHandler(segment)))
+	}
+	router := RequireNew(Options.Routes(options...))
+
+	for _, segment := range segments {
+		assertRoute(t, router, "GET", "/"+segment+"/detail", 200, segment, "")
+	}
+	assertRoute(t, router, "GET", "/alpha", 404, "Not Found\n", "")         // first segment only: fused tail unmatched
+	assertRoute(t, router, "GET", "/alpha/summary", 404, "Not Found\n", "") // right first segment, wrong tail
+	assertRoute(t, router, "GET", "/alpha/detailX", 404, "Not Found\n", "") // tail is a prefix, boundary rejects
+	assertRoute(t, router, "GET", "/mike/detail", 404, "Not Found\n", "")   // unregistered first segment
+}
+
+// TestCompactionCollapsesNodes asserts the pass actually merges the chain (not merely that routing still works),
+// and that an intermediate handler halts the merge so the node retains both its handler and its deeper child.
+func TestCompactionCollapsesNodes(t *testing.T) {
+	tree := &treeNode{}
+	addRoute(tree, "GET", "/alpha/beta/gamma")
+	tree.compact()
+
+	Assert(t).That(len(tree.static)).Equals(1)
+	Assert(t).That(tree.static[0].pathFragment).Equals("alpha/beta/gamma") // three segments fused into one node
+
+	branching := &treeNode{}
+	addRoute(branching, "GET", "/x/y")
+	addRoute(branching, "GET", "/x/y/z")
+	branching.compact()
+
+	merged := branching.static[0]
+	Assert(t).That(merged.pathFragment).Equals("x/y") // prefix fused, but the merge stops at the /x/y handler
+	if merged.handlers == nil {
+		t.Error("expected the /x/y handler to survive on the merged node")
+	}
+	Assert(t).That(len(merged.static)).Equals(1)
+	Assert(t).That(merged.static[0].pathFragment).Equals("z")
 }
 
 func TestFallbackToURL(t *testing.T) {
@@ -272,6 +351,7 @@ func BenchmarkTreeStatic(b *testing.B) {
 	addRoute(tree, "GET", "/stuff/identities")
 	addRoute(tree, "GET", "/stuff/identities/long/path")
 	addRoute(tree, "GET", "/stuff1")
+	tree.compact()
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -305,6 +385,7 @@ func BenchmarkTreeWide(b *testing.B) {
 	for i := 0; i < childCount; i++ {
 		addRoute(tree, "GET", fmt.Sprintf("/segment%d", i))
 	}
+	tree.compact()
 
 	// Resolve the last-registered child: worst case for a linear scan of the static children.
 	lastChild := fmt.Sprintf("/segment%d", childCount-1)
@@ -319,6 +400,7 @@ func BenchmarkTreeWide(b *testing.B) {
 func BenchmarkTreeVariable(b *testing.B) {
 	tree := &treeNode{}
 	addRoute(tree, "GET", "/stuff/:id/details")
+	tree.compact()
 
 	b.ReportAllocs()
 	b.ResetTimer()

@@ -15,12 +15,14 @@ func New(options ...Option) (http.Handler, error) {
 
 	treeRoot := &treeNode{}
 	for _, route := range config.Routes {
-		// FUTURE: add a "prune" function to where nodes with a single child are combined
-		// this would be called after all calls to Add have been completed which would finalize the tree.
 		if err := treeRoot.Add(route); err != nil {
 			return nil, err
 		}
 	}
+	// Routes are immutable after registration, so collapse single-child static chains into multi-segment
+	// nodes once here. This finalizes the tree, letting Resolve settle a non-branching path in one comparison
+	// instead of one recursive frame per segment.
+	treeRoot.compact()
 
 	router := newRouter(treeRoot, config.NotFound, config.MethodNotAllowed, config.Monitor)
 	if config.Recovery == nil {

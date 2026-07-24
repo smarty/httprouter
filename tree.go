@@ -115,6 +115,47 @@ func (this *treeNode) indexStatic(staticChild *treeNode) {
 		this.staticIndex[existingChild.pathFragment] = existingChild
 	}
 }
+
+// compact collapses chains of single-child static nodes into multi-segment fragments, turning the per-segment
+// trie into a compressed radix tree. It is a one-time pass run after all routes are registered — the tree is
+// immutable thereafter — so no edge-splitting is ever needed. It descends the whole tree but never extends a
+// node's own fragment; only a node's static children (genuine matched literals) are absorbed, via absorbChain.
+// This is why it is safe to call on the root, and on variable/wildcard nodes, whose own fragments are consumed
+// positionally rather than matched literally and so must never grow.
+func (this *treeNode) compact() {
+	for _, staticChild := range this.static {
+		staticChild.absorbChain()
+		staticChild.compact()
+	}
+	if this.variable != nil {
+		this.variable.compact()
+	}
+	if this.wildcard != nil {
+		this.wildcard.compact()
+	}
+}
+
+// absorbChain extends this static literal node by swallowing its lone static child for as long as the chain
+// stays unambiguous — exactly one static child, no variable or wildcard sibling, and no handler terminating
+// here. Merging appends "/<childFragment>" to this node's fragment and adopts the child's children, static
+// index, and handlers. The node pointer is unchanged, so the parent needs no rewiring, and a wide node's
+// staticIndex keys stay valid: absorption only ever extends fragments, never alters a node's first segment (the
+// map key) or its identity. The empty-fragment trailing-slash leaf is left alone — absorbing it would only
+// splice a '/' onto the fragment for no benefit.
+func (this *treeNode) absorbChain() {
+	for len(this.static) == 1 && this.variable == nil && this.wildcard == nil && this.handlers == nil {
+		onlyChild := this.static[0]
+		if onlyChild.pathFragment == "" {
+			return
+		}
+		this.pathFragment += "/" + onlyChild.pathFragment
+		this.static = onlyChild.static
+		this.staticIndex = onlyChild.staticIndex
+		this.variable = onlyChild.variable
+		this.wildcard = onlyChild.wildcard
+		this.handlers = onlyChild.handlers
+	}
+}
 func hasOnlyAllowedCharacters(input string) bool {
 	for index, value := range input {
 		if _, ok := allowedCharacters[value]; ok {
@@ -145,16 +186,30 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method
 	var staticAllowed, variableAllowed Method
 
 	if len(this.static) >= staticIndexThreshold {
-		// Wide node: the map is keyed by the segment string, so compute the fragment for the probe.
-		var pathFragment string
+		// Wide node: probe the map by the incoming path's first segment (the map key), then match the
+		// candidate child's full fragment — which may span several segments once the compaction pass has
+		// merged a single-child chain into it.
+		var firstSegment string
 		if slash := strings.IndexByte(incomingPath, '/'); slash < 0 {
-			pathFragment = incomingPath
+			firstSegment = incomingPath
 		} else {
-			pathFragment = incomingPath[:slash]
+			firstSegment = incomingPath[:slash]
 		}
-		if staticChild, found := this.staticIndex[pathFragment]; found {
-			if handler, staticAllowed = staticChild.Resolve(method, incomingPath[len(pathFragment):]); handler != nil {
-				return handler, MethodNone
+		if staticChild, found := this.staticIndex[firstSegment]; found {
+			fragmentLength := len(staticChild.pathFragment)
+			if fragmentLength == len(firstSegment) {
+				// Single-segment child (the common case): the map hit on firstSegment already fully validated
+				// the match and the boundary — no re-comparison needed.
+				if handler, staticAllowed = staticChild.Resolve(method, incomingPath[fragmentLength:]); handler != nil {
+					return handler, MethodNone
+				}
+			} else if len(incomingPath) >= fragmentLength && incomingPath[:fragmentLength] == staticChild.pathFragment &&
+				(fragmentLength == len(incomingPath) || incomingPath[fragmentLength] == '/') {
+				// Multi-segment (compacted) child: the map matched only the first segment, so confirm the rest
+				// of the fused fragment and its trailing segment boundary before descending.
+				if handler, staticAllowed = staticChild.Resolve(method, incomingPath[fragmentLength:]); handler != nil {
+					return handler, MethodNone
+				}
 			}
 		}
 	} else {
@@ -199,13 +254,6 @@ func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method
 	}
 
 	return nil, staticAllowed | variableAllowed
-}
-func parsePathFragment(value string) string {
-	if index := strings.IndexByte(value, '/'); index == -1 {
-		return value
-	} else {
-		return value[0:index]
-	}
 }
 
 var allowedCharacters = map[rune]struct{}{
