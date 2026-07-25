@@ -175,90 +175,117 @@ func hasOnlyAllowedCharacters(input string) bool {
 	return true
 }
 
+// Resolve walks the tree iteratively. Whenever a node's only viable continuation is a single deterministic edge —
+// a static match with no variable or wildcard sibling to fall back to, or a variable with no static match and no
+// wildcard — the walk reassigns the receiver and loops instead of recursing, so a non-branching path costs no
+// stack frames at all. Recursion is kept only where a node genuinely has an alternative to try if the
+// higher-priority edge fails to resolve the requested method.
 func (this *treeNode) Resolve(method, incomingPath string) (http.Handler, Method) {
-	if len(incomingPath) == 0 {
-		if this.handlers == nil {
-			return nil, 0
+	for {
+		if len(incomingPath) == 0 {
+			if this.handlers == nil {
+				return nil, 0
+			}
+			return this.handlers.Resolve(method), this.handlers.allowed
 		}
-		return this.handlers.Resolve(method), this.handlers.allowed
-	}
 
-	if incomingPath[0] == '/' {
-		incomingPath = incomingPath[1:]
-	}
+		if incomingPath[0] == '/' {
+			incomingPath = incomingPath[1:]
+		}
 
-	var handler http.Handler
-	var staticAllowed, variableAllowed Method
+		var matchedStatic *treeNode
 
-	if len(this.static) >= staticIndexThreshold {
-		// Wide node: probe the map by the incoming path's first segment (the map key), then match the
-		// candidate child's full fragment — which may span several segments once the compaction pass has
-		// merged a single-child chain into it.
-		var firstSegment string
-		if slash := strings.IndexByte(incomingPath, '/'); slash < 0 {
-			firstSegment = incomingPath
+		if len(this.static) >= staticIndexThreshold {
+			// Wide node: probe the map by the incoming path's first segment (the map key), then match the
+			// candidate child's full fragment — which may span several segments once the compaction pass has
+			// merged a single-child chain into it.
+			var firstSegment string
+			if slash := strings.IndexByte(incomingPath, '/'); slash < 0 {
+				firstSegment = incomingPath
+			} else {
+				firstSegment = incomingPath[:slash]
+			}
+			if staticChild, found := this.staticIndex[firstSegment]; found {
+				fragmentLength := len(staticChild.pathFragment)
+				if fragmentLength == len(firstSegment) {
+					// Single-segment child (the common case): the map hit on firstSegment already fully
+					// validated the match and the boundary — no re-comparison needed.
+					matchedStatic = staticChild
+				} else if len(incomingPath) >= fragmentLength && incomingPath[:fragmentLength] == staticChild.pathFragment &&
+					(fragmentLength == len(incomingPath) || incomingPath[fragmentLength] == '/') {
+					// Multi-segment (compacted) child: the map matched only the first segment, so confirm the
+					// rest of the fused fragment and its trailing segment boundary before descending.
+					matchedStatic = staticChild
+				}
+			}
 		} else {
-			firstSegment = incomingPath[:slash]
-		}
-		if staticChild, found := this.staticIndex[firstSegment]; found {
-			fragmentLength := len(staticChild.pathFragment)
-			if fragmentLength == len(firstSegment) {
-				// Single-segment child (the common case): the map hit on firstSegment already fully validated
-				// the match and the boundary — no re-comparison needed.
-				if handler, staticAllowed = staticChild.Resolve(method, incomingPath[fragmentLength:]); handler != nil {
-					return handler, MethodNone
+			// Narrow node: match each child fragment as a segment prefix — no IndexByte scan needed.
+			for _, staticChild := range this.static {
+				fragmentLength := len(staticChild.pathFragment)
+				if len(incomingPath) < fragmentLength {
+					continue
 				}
-			} else if len(incomingPath) >= fragmentLength && incomingPath[:fragmentLength] == staticChild.pathFragment &&
-				(fragmentLength == len(incomingPath) || incomingPath[fragmentLength] == '/') {
-				// Multi-segment (compacted) child: the map matched only the first segment, so confirm the rest
-				// of the fused fragment and its trailing segment boundary before descending.
-				if handler, staticAllowed = staticChild.Resolve(method, incomingPath[fragmentLength:]); handler != nil {
-					return handler, MethodNone
+				if fragmentLength > 0 && incomingPath[0] != staticChild.pathFragment[0] {
+					continue // cheap first-byte reject before the full compare (empty fragment: trailing-slash child)
 				}
-			}
-		}
-	} else {
-		// Narrow node: match each child fragment as a segment prefix — no IndexByte scan needed.
-		for _, staticChild := range this.static {
-			fragmentLength := len(staticChild.pathFragment)
-			if len(incomingPath) < fragmentLength {
-				continue
-			}
-			if fragmentLength > 0 && incomingPath[0] != staticChild.pathFragment[0] {
-				continue // cheap first-byte reject before the full compare (empty fragment: trailing-slash child)
-			}
-			if incomingPath[:fragmentLength] != staticChild.pathFragment {
-				continue
-			}
-			if fragmentLength != len(incomingPath) && incomingPath[fragmentLength] != '/' {
-				continue // segment boundary mismatch (e.g. child "stuff" vs segment "stuffx")
-			}
+				if incomingPath[:fragmentLength] != staticChild.pathFragment {
+					continue
+				}
+				if fragmentLength != len(incomingPath) && incomingPath[fragmentLength] != '/' {
+					continue // segment boundary mismatch (e.g. child "stuff" vs segment "stuffx")
+				}
 
-			if handler, staticAllowed = staticChild.Resolve(method, incomingPath[fragmentLength:]); handler != nil {
+				matchedStatic = staticChild
+				break
+			}
+		}
+
+		var staticAllowed, variableAllowed Method
+
+		if matchedStatic != nil {
+			remainingPath := incomingPath[len(matchedStatic.pathFragment):]
+			if this.variable == nil && this.wildcard == nil {
+				this = matchedStatic
+				incomingPath = remainingPath
+				continue
+			}
+			handler, allowed := matchedStatic.Resolve(method, remainingPath)
+			if handler != nil {
 				return handler, MethodNone
 			}
-
-			break
+			staticAllowed = allowed
 		}
-	}
 
-	if this.variable != nil && len(incomingPath) > 0 && incomingPath[0] != '/' {
-		// A variable consumes exactly one segment, so the boundary is needed here.
-		var remainingPath string
-		if slash := strings.IndexByte(incomingPath, '/'); slash >= 0 {
-			remainingPath = incomingPath[slash:]
+		if this.variable != nil && len(incomingPath) > 0 && incomingPath[0] != '/' {
+			// A variable consumes exactly one segment, so the boundary is needed here.
+			var remainingPath string
+			if slash := strings.IndexByte(incomingPath, '/'); slash >= 0 {
+				remainingPath = incomingPath[slash:]
+			}
+			if matchedStatic == nil && this.wildcard == nil {
+				this = this.variable
+				incomingPath = remainingPath
+				continue
+			}
+			handler, allowed := this.variable.Resolve(method, remainingPath)
+			if handler != nil {
+				return handler, MethodNone
+			}
+			variableAllowed = allowed
 		}
-		if handler, variableAllowed = this.variable.Resolve(method, remainingPath); handler != nil {
-			return handler, MethodNone
+
+		if this.wildcard != nil {
+			if matchedStatic == nil && this.variable == nil {
+				this = this.wildcard
+				incomingPath = ""
+				continue
+			}
+			handler, wildcardAllowed := this.wildcard.Resolve(method, "")
+			return handler, staticAllowed | variableAllowed | wildcardAllowed
 		}
-	}
 
-	if this.wildcard != nil {
-		wildcardHandler, wildcardAllowed := this.wildcard.Resolve(method, "")
-		return wildcardHandler, staticAllowed | variableAllowed | wildcardAllowed
+		return nil, staticAllowed | variableAllowed
 	}
-
-	return nil, staticAllowed | variableAllowed
 }
 
 var allowedCharacters = map[rune]struct{}{
